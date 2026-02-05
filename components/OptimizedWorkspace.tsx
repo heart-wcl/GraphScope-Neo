@@ -27,8 +27,14 @@ import {
   generateNodeCoordinates,
   truncateGraphData
 } from '../utils/dataValidation';
-import { Play, X, Plus, Database, AlertCircle, Activity, Download } from 'lucide-react';
+import { Play, X, Plus, Database, AlertCircle, Activity, Download, Search, Route, Layers, Cpu, History, Key } from 'lucide-react';
 import ImportExport from './ImportExport';
+import ConstraintManager from './ConstraintManager';
+import FulltextSearch from './FulltextSearch';
+import PathFinder from './PathFinder';
+import DatabaseManager from './DatabaseManager';
+import AlgorithmRunner from './AlgorithmRunner';
+import QueryHistory from './QueryHistory';
 
 interface OptimizedWorkspaceProps {
   config: ConnectionConfig;
@@ -70,6 +76,14 @@ const OptimizedWorkspace: React.FC<OptimizedWorkspaceProps> = ({
   
   // Import/Export modal state
   const [showImportExport, setShowImportExport] = useState(false);
+  
+  // Feature modals state
+  const [showConstraintManager, setShowConstraintManager] = useState(false);
+  const [showFulltextSearch, setShowFulltextSearch] = useState(false);
+  const [showPathFinder, setShowPathFinder] = useState(false);
+  const [showDatabaseManager, setShowDatabaseManager] = useState(false);
+  const [showAlgorithmRunner, setShowAlgorithmRunner] = useState(false);
+  const [showQueryHistory, setShowQueryHistory] = useState(false);
 
   const [isGraphResult, setIsGraphResult] = useState(true);
   const [queryResult, setQueryResult] = useState<{ columns: string[]; rows: any[] } | null>(null);
@@ -440,10 +454,63 @@ const OptimizedWorkspace: React.FC<OptimizedWorkspaceProps> = ({
               <button
                 onClick={() => setShowImportExport(true)}
                 disabled={isLoading}
-                className="flex items-center gap-2 px-4 py-2 rounded-md bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 transition-colors text-sm disabled:opacity-50"
+                className="flex items-center gap-2 px-3 py-2 rounded-md bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 transition-colors text-xs disabled:opacity-50"
               >
-                <Download className="w-4 h-4" />
-                导入/导出
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden lg:inline">导入/导出</span>
+              </button>
+
+              <button
+                onClick={() => setShowFulltextSearch(true)}
+                disabled={isLoading || config.protocol === 'demo'}
+                className="flex items-center gap-2 px-3 py-2 rounded-md bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 transition-colors text-xs disabled:opacity-50"
+              >
+                <Search className="w-3.5 h-3.5" />
+                <span className="hidden lg:inline">全文搜索</span>
+              </button>
+
+              <button
+                onClick={() => setShowPathFinder(true)}
+                disabled={isLoading || config.protocol === 'demo'}
+                className="flex items-center gap-2 px-3 py-2 rounded-md bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/30 transition-colors text-xs disabled:opacity-50"
+              >
+                <Route className="w-3.5 h-3.5" />
+                <span className="hidden lg:inline">路径查找</span>
+              </button>
+
+              <button
+                onClick={() => setShowAlgorithmRunner(true)}
+                disabled={isLoading || config.protocol === 'demo'}
+                className="flex items-center gap-2 px-3 py-2 rounded-md bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/30 transition-colors text-xs disabled:opacity-50"
+              >
+                <Cpu className="w-3.5 h-3.5" />
+                <span className="hidden lg:inline">图算法</span>
+              </button>
+
+              <button
+                onClick={() => setShowConstraintManager(true)}
+                disabled={isLoading || config.protocol === 'demo'}
+                className="flex items-center gap-2 px-3 py-2 rounded-md bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 transition-colors text-xs disabled:opacity-50"
+              >
+                <Key className="w-3.5 h-3.5" />
+                <span className="hidden lg:inline">约束</span>
+              </button>
+
+              <button
+                onClick={() => setShowDatabaseManager(true)}
+                disabled={isLoading || config.protocol === 'demo'}
+                className="flex items-center gap-2 px-3 py-2 rounded-md bg-pink-500/10 hover:bg-pink-500/20 text-pink-400 border border-pink-500/30 transition-colors text-xs disabled:opacity-50"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span className="hidden lg:inline">数据库</span>
+              </button>
+
+              <button
+                onClick={() => setShowQueryHistory(true)}
+                className="flex items-center gap-2 px-3 py-2 rounded-md bg-gray-500/10 hover:bg-gray-500/20 text-gray-400 border border-gray-500/30 transition-colors text-xs"
+              >
+                <History className="w-3.5 h-3.5" />
+                <span className="hidden lg:inline">历史</span>
               </button>
 
               {selectedNode && (
@@ -686,6 +753,79 @@ const OptimizedWorkspace: React.FC<OptimizedWorkspaceProps> = ({
           graphData={data}
           onClose={() => setShowImportExport(false)}
           onImportComplete={runQuery}
+        />
+      )}
+
+      {/* Constraint Manager Modal */}
+      {showConstraintManager && (
+        <ConstraintManager
+          driver={driver}
+          database={config.database}
+          onClose={() => setShowConstraintManager(false)}
+        />
+      )}
+
+      {/* Fulltext Search Modal */}
+      {showFulltextSearch && (
+        <FulltextSearch
+          driver={driver}
+          database={config.database}
+          onClose={() => setShowFulltextSearch(false)}
+          onResultSelect={(node) => {
+            setSelectedNode(node);
+            setShowFulltextSearch(false);
+          }}
+        />
+      )}
+
+      {/* Path Finder Modal */}
+      {showPathFinder && (
+        <PathFinder
+          driver={driver}
+          database={config.database}
+          nodes={data.nodes}
+          onClose={() => setShowPathFinder(false)}
+          onPathFound={(pathData) => {
+            // Highlight the path in the graph
+            console.log('Path found:', pathData);
+          }}
+        />
+      )}
+
+      {/* Database Manager Modal */}
+      {showDatabaseManager && (
+        <DatabaseManager
+          driver={driver}
+          currentDatabase={config.database}
+          onClose={() => setShowDatabaseManager(false)}
+          onDatabaseChange={(dbName) => {
+            // Could trigger reconnection with new database
+            console.log('Switch to database:', dbName);
+          }}
+        />
+      )}
+
+      {/* Algorithm Runner Modal */}
+      {showAlgorithmRunner && (
+        <AlgorithmRunner
+          driver={driver}
+          database={config.database}
+          onClose={() => setShowAlgorithmRunner(false)}
+          onResultsReady={(results) => {
+            console.log('Algorithm results:', results);
+          }}
+        />
+      )}
+
+      {/* Query History Modal */}
+      {showQueryHistory && (
+        <QueryHistory
+          onClose={() => setShowQueryHistory(false)}
+          onSelectQuery={(selectedQuery) => {
+            setQuery(selectedQuery);
+            setShowQueryHistory(false);
+          }}
+          currentQuery={query}
         />
       )}
     </div>
