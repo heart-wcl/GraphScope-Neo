@@ -1,11 +1,11 @@
 /**
  * Performance Monitor Component
- * 性能监控面板 - 实时显示性能指标
+ * 性能监控面板 - 实时显示性能指标，支持拖动
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { PerformanceMetrics } from '../types';
-import { Activity, Cpu, HardDrive, Zap, Layers, Network } from 'lucide-react';
+import { Activity, Cpu, HardDrive, Zap, Layers, Network, GripVertical } from 'lucide-react';
 
 interface PerformanceMonitorProps {
   metrics: PerformanceMetrics | null;
@@ -19,6 +19,50 @@ const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
   onToggle
 }) => {
   const [history, setHistory] = useState<number[]>([]);
+  const [position, setPosition] = useState({ x: 16, y: window.innerHeight - 300 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startPosX: position.x,
+      startPosY: position.y
+    };
+  }, [position]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging || !dragRef.current) return;
+      
+      const deltaX = e.clientX - dragRef.current.startX;
+      const deltaY = e.clientY - dragRef.current.startY;
+      
+      const newX = Math.max(0, Math.min(window.innerWidth - 280, dragRef.current.startPosX + deltaX));
+      const newY = Math.max(0, Math.min(window.innerHeight - 100, dragRef.current.startPosY + deltaY));
+      
+      setPosition({ x: newX, y: newY });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      dragRef.current = null;
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
 
   useEffect(() => {
     if (metrics?.fps) {
@@ -51,7 +95,8 @@ const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
     return (
       <button
         onClick={onToggle}
-        className="fixed bottom-4 left-4 bg-neo-panel/80 backdrop-blur-md px-3 py-2 rounded-lg border border-neo-border text-neo-dim hover:text-neo-text transition-all z-50 flex items-center gap-2"
+        style={{ left: position.x, top: position.y }}
+        className="fixed bg-neo-panel/80 backdrop-blur-md px-3 py-2 rounded-lg border border-neo-border text-neo-dim hover:text-neo-text transition-all z-50 flex items-center gap-2"
       >
         <Activity className="w-4 h-4" />
         <span className="text-xs font-medium">性能监控</span>
@@ -60,15 +105,24 @@ const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
   }
 
   return (
-    <div className="fixed bottom-4 left-4 w-80 bg-neo-panel/95 backdrop-blur-md rounded-xl border border-neo-border shadow-2xl z-50 overflow-hidden">
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-neo-border flex items-center justify-between">
+    <div 
+      ref={panelRef}
+      style={{ left: position.x, top: position.y }}
+      className="fixed w-64 bg-neo-panel/95 backdrop-blur-md rounded-xl border border-neo-border shadow-2xl z-50 overflow-hidden"
+    >
+      {/* Header - Draggable */}
+      <div 
+        className={`px-3 py-2 border-b border-neo-border flex items-center justify-between cursor-move select-none ${isDragging ? 'bg-neo-primary/10' : ''}`}
+        onMouseDown={handleMouseDown}
+      >
         <div className="flex items-center gap-2">
+          <GripVertical className="w-3 h-3 text-neo-dim" />
           <Activity className="w-4 h-4 text-neo-primary" />
-          <span className="text-sm font-bold text-white">性能监控</span>
+          <span className="text-xs font-bold text-white">性能监控</span>
         </div>
         <button
           onClick={onToggle}
+          onMouseDown={(e) => e.stopPropagation()}
           className="text-neo-dim hover:text-neo-text transition-colors"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -78,87 +132,76 @@ const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
       </div>
 
       {/* Content */}
-      <div className="p-4 space-y-4">
+      <div className="p-3 space-y-2">
         {/* FPS */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Zap className="w-4 h-4 text-neo-primary" />
-            <span className="text-xs text-neo-dim">帧率 (FPS)</span>
+          <div className="flex items-center gap-1.5">
+            <Zap className="w-3.5 h-3.5 text-neo-primary" />
+            <span className="text-[10px] text-neo-dim">帧率 (FPS)</span>
           </div>
-          <span className={`text-lg font-bold ${getFpsColor(metrics.fps)}`}>
+          <span className={`text-sm font-bold ${getFpsColor(metrics.fps)}`}>
             {metrics.fps.toFixed(1)}
           </span>
         </div>
 
         {/* FPS Chart */}
-        <div className="h-12 bg-neo-bg rounded-lg p-2">
-          <svg width="100%" height="100%" viewBox="0 0 280 32" preserveAspectRatio="none">
+        <div className="h-8 bg-neo-bg rounded-lg p-1">
+          <svg width="100%" height="100%" viewBox="0 0 220 24" preserveAspectRatio="none">
             <polyline
               fill="none"
               stroke={metrics.fps >= 55 ? '#00FF88' : metrics.fps >= 30 ? '#FFEA00' : '#FF4081'}
               strokeWidth="2"
               points={history.map((fps, i) => {
-                const x = (i / 59) * 280;
-                const y = 32 - (fps / 60) * 32;
+                const x = (i / 59) * 220;
+                const y = 24 - (fps / 60) * 24;
                 return `${x},${y}`;
               }).join(' ')}
             />
           </svg>
         </div>
 
-        {/* Memory */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <HardDrive className="w-4 h-4 text-neo-secondary" />
-            <span className="text-xs text-neo-dim">内存占用</span>
-          </div>
-          <span className={`text-sm font-bold ${getMemoryColor(metrics.memory)}`}>
-            {metrics.memory.toFixed(1)} MB
-          </span>
-        </div>
-
-        {/* Render Time */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Cpu className="w-4 h-4 text-orange-400" />
-            <span className="text-xs text-neo-dim">渲染时间</span>
-          </div>
-          <span className="text-sm font-bold text-white">
-            {metrics.renderTime.toFixed(2)} ms
-          </span>
-        </div>
-
-        {/* Separator */}
-        <div className="border-t border-neo-border pt-3 space-y-3">
-          {/* Visible Nodes */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Layers className="w-4 h-4 text-blue-400" />
-              <span className="text-xs text-neo-dim">可见节点</span>
-            </div>
-            <span className="text-sm font-medium text-white">
-              {metrics.visibleNodes.toLocaleString()} / {metrics.totalNodes.toLocaleString()}
+        {/* Memory & Render Time - Side by side */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex items-center justify-between bg-neo-bg/50 rounded px-2 py-1">
+            <HardDrive className="w-3 h-3 text-neo-secondary" />
+            <span className={`text-xs font-bold ${getMemoryColor(metrics.memory)}`}>
+              {metrics.memory.toFixed(1)} MB
             </span>
           </div>
-
-          {/* Visible Links */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Network className="w-4 h-4 text-purple-400" />
-              <span className="text-xs text-neo-dim">可见关系</span>
-            </div>
-            <span className="text-sm font-medium text-white">
-              {metrics.visibleLinks.toLocaleString()} / {metrics.totalLinks.toLocaleString()}
+          <div className="flex items-center justify-between bg-neo-bg/50 rounded px-2 py-1">
+            <Cpu className="w-3 h-3 text-orange-400" />
+            <span className="text-xs font-bold text-white">
+              {metrics.renderTime.toFixed(2)} ms
             </span>
           </div>
+        </div>
 
-          {/* Cull Rate */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-green-400" />
-              <span className="text-xs text-neo-dim">裁剪率</span>
+        {/* Stats Grid */}
+        <div className="border-t border-neo-border pt-2 grid grid-cols-3 gap-1.5 text-center">
+          <div className="bg-neo-bg/50 rounded px-1.5 py-1">
+            <div className="flex items-center justify-center gap-1 mb-0.5">
+              <Layers className="w-3 h-3 text-blue-400" />
+              <span className="text-[9px] text-neo-dim">节点</span>
             </div>
-            <span className={`text-sm font-bold ${getCullRateColor(metrics.cullRate)}`}>
+            <span className="text-[10px] font-medium text-white">
+              {metrics.visibleNodes} / {metrics.totalNodes}
+            </span>
+          </div>
+          <div className="bg-neo-bg/50 rounded px-1.5 py-1">
+            <div className="flex items-center justify-center gap-1 mb-0.5">
+              <Network className="w-3 h-3 text-purple-400" />
+              <span className="text-[9px] text-neo-dim">关系</span>
+            </div>
+            <span className="text-[10px] font-medium text-white">
+              {metrics.visibleLinks} / {metrics.totalLinks}
+            </span>
+          </div>
+          <div className="bg-neo-bg/50 rounded px-1.5 py-1">
+            <div className="flex items-center justify-center gap-1 mb-0.5">
+              <Activity className="w-3 h-3 text-green-400" />
+              <span className="text-[9px] text-neo-dim">裁剪</span>
+            </div>
+            <span className={`text-[10px] font-bold ${getCullRateColor(metrics.cullRate)}`}>
               {(metrics.cullRate * 100).toFixed(1)}%
             </span>
           </div>

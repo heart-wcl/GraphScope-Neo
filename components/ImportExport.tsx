@@ -285,7 +285,7 @@ const ImportExport: React.FC<ImportExportProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-80 p-4">
-      <div className="glass-panel rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden animate-fade-in">
+      <div className="glass-panel rounded-2xl w-full max-w-2xl max-h-[70vh] flex flex-col overflow-hidden animate-fade-in">
         {/* Header */}
         <div className="p-4 md:p-6 border-b border-neo-border flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -355,12 +355,12 @@ const ImportExport: React.FC<ImportExportProps> = ({
                 <label className="block text-xs font-bold text-neo-dim uppercase mb-2">
                   导出格式
                 </label>
-                <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+                <div className="grid grid-cols-5 gap-1.5">
                   {EXPORT_FORMATS.map(format => (
                     <button
                       key={format.id}
                       onClick={() => setExportFormat(format.id)}
-                      className={`flex flex-col items-center gap-1 px-3 py-2.5 rounded-lg transition-colors ${
+                      className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-colors ${
                         exportFormat === format.id
                           ? 'bg-orange-500/20 border border-orange-400 text-orange-400'
                           : 'bg-neo-bg border border-neo-border text-neo-dim hover:border-orange-400/50'
@@ -368,7 +368,7 @@ const ImportExport: React.FC<ImportExportProps> = ({
                       title={format.description}
                     >
                       {format.icon}
-                      <span className="text-xs">{format.name}</span>
+                      <span className="text-[10px]">{format.name}</span>
                     </button>
                   ))}
                 </div>
