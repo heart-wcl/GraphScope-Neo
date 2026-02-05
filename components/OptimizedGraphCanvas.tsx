@@ -6,7 +6,8 @@ import {
   getNodeSize,
   shouldShowLabels,
   renderNodeByLOD,
-  renderRelationshipByLOD
+  renderRelationshipByLOD,
+  setRendererTheme
 } from '../utils/performance/lodRenderer';
 import {
   getViewport,
@@ -57,6 +58,11 @@ const OptimizedGraphCanvas: React.FC<OptimizedGraphCanvasProps> = ({
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   
   const { theme } = useTheme();
+
+  // 同步主题到渲染器
+  useEffect(() => {
+    setRendererTheme(theme);
+  }, [theme]);
 
   // 存储节点的基础位置和浮动状态
   const nodePositionsRef = useRef<Map<string, { baseX: number; baseY: number }>>(new Map());

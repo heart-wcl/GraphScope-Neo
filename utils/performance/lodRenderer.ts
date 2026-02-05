@@ -17,6 +17,64 @@ export {
   DEFAULT_LOD_CONFIG
 } from '../../types/performance/lod';
 
+// 主题颜色配置
+export type Theme = 'light' | 'dark';
+
+interface ThemeColors {
+  background: string;
+  nodeBackground: string;
+  nodeBorder: string;
+  nodeIcon: string;
+  labelText: string;
+  labelBackground: string;
+  linkLine: string;
+  linkArrow: string;
+  linkLabel: string;
+  particleGlow: string;
+}
+
+const THEME_COLORS: Record<Theme, ThemeColors> = {
+  dark: {
+    background: '#0B0E14',
+    nodeBackground: '#0B0E14',
+    nodeBorder: '#FFFFFF',
+    nodeIcon: '#FFFFFF',
+    labelText: '#E2E8F0',
+    labelBackground: '#0B0E14',
+    linkLine: '#334155',
+    linkArrow: '#475569',
+    linkLabel: '#94A3B8',
+    particleGlow: 'rgba(255, 255, 255, 1)',
+  },
+  light: {
+    background: '#FFFFFF',
+    nodeBackground: '#FFFFFF',
+    nodeBorder: '#1E293B',
+    nodeIcon: '#1E293B',
+    labelText: '#1E293B',
+    labelBackground: '#FFFFFF',
+    linkLine: '#94A3B8',
+    linkArrow: '#64748B',
+    linkLabel: '#475569',
+    particleGlow: 'rgba(59, 130, 246, 1)',
+  },
+};
+
+// 当前主题（模块级状态）
+let currentTheme: Theme = 'dark';
+
+export function setRendererTheme(theme: Theme): void {
+  currentTheme = theme;
+}
+
+export function getRendererTheme(): Theme {
+  return currentTheme;
+}
+
+function getColors(): ThemeColors {
+  return THEME_COLORS[currentTheme];
+}
+
 /**
  * 渲染 LOD 模式下的节点（简洁现代风格）
  */
@@ -43,9 +101,10 @@ export function renderNodeByLOD(
 
     case 'simple':
       // 带边框的圆点
+      const simpleColors = getColors();
       ctx.beginPath();
       ctx.arc(x, y, config.nodeSize.simple, 0, Math.PI * 2);
-      ctx.fillStyle = '#0B0E14'; // 背景色填充，遮挡线条
+      ctx.fillStyle = simpleColors.nodeBackground;
       ctx.fill();
       
       ctx.beginPath();
@@ -53,24 +112,25 @@ export function renderNodeByLOD(
       ctx.fillStyle = color;
       ctx.fill();
       
-      // 亮色边框
-      ctx.strokeStyle = '#FFFFFF';
+      // 边框
+      ctx.strokeStyle = simpleColors.nodeBorder;
       ctx.lineWidth = 1;
       ctx.stroke();
       break;
 
     case 'with-labels':
       // 简洁标签模式
+      const labelColors = getColors();
       // 背景遮挡
       ctx.beginPath();
       ctx.arc(x, y, config.nodeSize.labeled, 0, Math.PI * 2);
-      ctx.fillStyle = '#0B0E14';
+      ctx.fillStyle = labelColors.nodeBackground;
       ctx.fill();
 
       // 主体
       ctx.beginPath();
       ctx.arc(x, y, config.nodeSize.labeled, 0, Math.PI * 2);
-      ctx.fillStyle = colorWithAlpha(color, 0.2); // 半透明填充
+      ctx.fillStyle = colorWithAlpha(color, currentTheme === 'dark' ? 0.2 : 0.15);
       ctx.fill();
       
       // 边框
@@ -91,23 +151,24 @@ export function renderNodeByLOD(
 
     case 'full':
       // 完整模式：清晰的图标和标签
+      const fullColors = getColors();
       // 背景遮挡（避免连线穿过节点内部）
       ctx.beginPath();
       ctx.arc(x, y, size, 0, Math.PI * 2);
-      ctx.fillStyle = '#0B0E14';
+      ctx.fillStyle = fullColors.nodeBackground;
       ctx.fill();
 
       // 1. 外部光环（仅一点点，增加层次）
       ctx.beginPath();
       ctx.arc(x, y, size + 2, 0, Math.PI * 2);
-      ctx.strokeStyle = colorWithAlpha(color, 0.3);
+      ctx.strokeStyle = colorWithAlpha(color, currentTheme === 'dark' ? 0.3 : 0.4);
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      // 2. 节点主体背景 (深色玻璃感)
+      // 2. 节点主体背景
       ctx.beginPath();
       ctx.arc(x, y, size, 0, Math.PI * 2);
-      ctx.fillStyle = colorWithAlpha(color, 0.1);
+      ctx.fillStyle = colorWithAlpha(color, currentTheme === 'dark' ? 0.1 : 0.15);
       ctx.fill();
 
       // 3. 节点边框 (高亮)
@@ -125,7 +186,7 @@ export function renderNodeByLOD(
       ctx.stroke();
 
       // 绘制图标
-      renderNodeIcon(ctx, node, x, y, size, '#FFFFFF'); // 图标始终白色，保证清晰
+      renderNodeIcon(ctx, node, x, y, size, fullColors.nodeIcon);
 
       // 完整标签
       if (config.labelConfig.enabled) {
@@ -188,11 +249,11 @@ function renderShortLabel(
   const label = getShortLabel(node, config.labelConfig.maxLength);
   if (!label) return;
 
+  const colors = getColors();
   const fontSize = config.labelConfig.fontSize.short;
   ctx.font = `500 ${fontSize}px "Inter", system-ui, sans-serif`;
   
-  // 无阴影，纯色
-  ctx.fillStyle = '#E2E8F0';
+  ctx.fillStyle = colors.labelText;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText(label, x, y + config.nodeSize.labeled + 6);
@@ -209,6 +270,7 @@ function renderFullLabel(
   radius: number,
   config: LODConfig
 ): void {
+  const colors = getColors();
   const name = getNodeLabel(node);
   const typeLabel = node.labels[0] || '';
   
@@ -225,12 +287,12 @@ function renderFullLabel(
   if (name) {
     ctx.font = `500 ${config.labelConfig.fontSize.full}px "Inter", system-ui, sans-serif`;
     
-    // 简单的深色描边保证在任何背景可见
-    ctx.strokeStyle = '#0B0E14';
+    // 描边保证在任何背景可见
+    ctx.strokeStyle = colors.labelBackground;
     ctx.lineWidth = 2;
     ctx.strokeText(name, x, y + radius + 18);
     
-    ctx.fillStyle = '#F8FAFC';
+    ctx.fillStyle = colors.labelText;
     ctx.fillText(name, x, y + radius + 18);
   }
 }
@@ -403,12 +465,13 @@ export function renderRelationshipByLOD(
   const endX = x2 - Math.cos(angle) * (targetRadius + 6);
   const endY = y2 - Math.sin(angle) * (targetRadius + 6);
 
+  const colors = getColors();
+  
   // 1. 绘制基础连线
   ctx.beginPath();
   ctx.moveTo(startX, startY);
   ctx.lineTo(endX, endY);
-  // 使用较暗的灰色作为连线，不抢眼
-  ctx.strokeStyle = '#334155'; // Slate-700
+  ctx.strokeStyle = colors.linkLine;
   ctx.lineWidth = mode === 'dots' ? 1 : 1.5;
   ctx.stroke();
 
@@ -427,12 +490,15 @@ export function renderRelationshipByLOD(
     const glowRadius = 5;
     const gradient = ctx.createRadialGradient(particleX, particleY, 0, particleX, particleY, glowRadius);
     
-    // 核心高亮
-    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-    // 中间过渡
-    gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.6)');
-    // 边缘消散
-    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    if (currentTheme === 'dark') {
+      gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.6)');
+      gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    } else {
+      gradient.addColorStop(0, 'rgba(59, 130, 246, 1)');
+      gradient.addColorStop(0.3, 'rgba(59, 130, 246, 0.6)');
+      gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+    }
 
     ctx.beginPath();
     ctx.arc(particleX, particleY, glowRadius, 0, Math.PI * 2);
@@ -442,12 +508,12 @@ export function renderRelationshipByLOD(
 
   // 在非点模式下绘制箭头
   if (mode !== 'dots') {
-    renderArrow(ctx, startX, startY, endX, endY, '#475569'); // Slate-600
+    renderArrow(ctx, startX, startY, endX, endY, colors.linkArrow);
   }
 
   // 在标签模式下绘制关系类型标签
   if (mode === 'with-labels' || mode === 'full') {
-    renderRelationshipLabel(ctx, relationship, startX, startY, endX, endY, '#94A3B8'); // Slate-400
+    renderRelationshipLabel(ctx, relationship, startX, startY, endX, endY, colors.linkLabel);
   }
 }
 
@@ -492,6 +558,7 @@ function renderRelationshipLabel(
   y2: number,
   color: string
 ): void {
+  const colors = getColors();
   const midX = (x1 + x2) / 2;
   const midY = (y1 + y2) / 2;
 
@@ -503,7 +570,7 @@ function renderRelationshipLabel(
   const width = metrics.width + paddingX * 2;
 
   // 纯色背景，无边框
-  ctx.fillStyle = '#0B0E14';
+  ctx.fillStyle = colors.labelBackground;
   ctx.fillRect(midX - width / 2, midY - height / 2, width, height);
 
   // 文本
