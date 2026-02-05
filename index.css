@@ -1,0 +1,153 @@
+/* Reset and Base Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+} 
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+:root {
+  --neo-bg: #0B0E14;
+  --neo-panel: #151921;
+  --neo-border: #2A303C;
+  --neo-primary: #00F2FF;
+  --neo-secondary: #3746A3;
+  --neo-accent: #FF0055;
+  --neo-text: #E2E8F0;
+  --neo-dim: #94A3B8;
+}
+
+[data-theme="dark"] {
+  --neo-bg: #0B0E14;
+  --neo-panel: #151921;
+  --neo-border: #2A303C;
+  --neo-primary: #00F2FF;
+  --neo-secondary: #3746A3;
+  --neo-accent: #FF0055;
+  --neo-text: #E2E8F0;
+  --neo-dim: #94A3B8;
+}
+
+[data-theme="light"] {
+  --neo-bg: #FFFFFF;
+  --neo-panel: #F8FAFC;
+  --neo-border: #E2E8F0;
+  --neo-primary: #0066CC;
+  --neo-secondary: #4A90E2;
+  --neo-accent: #E91E63;
+  --neo-text: #1E293B;
+  --neo-dim: #6B7280;
+}
+
+body {
+  background-color: var(--neo-bg);
+  color: var(--neo-text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--neo-panel);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--neo-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--neo-secondary);
+}
+
+/* Glass Panel Effect */
+.glass-panel {
+  background: var(--neo-panel);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--neo-border);
+}
+
+/* Neon Glow Effect */
+.neon-glow {
+  box-shadow: 0 0 10px color-mix(in srgb, var(--neo-primary) 20%, transparent), 0 0 20px color-mix(in srgb, var(--neo-primary) 10%, transparent);
+}
+
+/* Node Label Styling */
+.node-label {
+  text-shadow: 0 1px 3px color-mix(in srgb, var(--neo-bg) 80%, transparent);
+  pointer-events: none;
+}
+
+/* Hide scrollbar but allow scrolling */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Custom scrollbar for containers */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--neo-border);
+  border-radius: 3px;
+}
+
+/* Animation Utilities */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out;
+}

@@ -1,0 +1,39 @@
+{
+  "name": "graphscope-neo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage --maxWorkers=2"
+  },
+  "dependencies": {
+    "d3": "^7.9.0",
+    "lucide-react": "^0.563.0",
+    "neo4j-driver": "5.20.0",
+    "puppeteer": "^24.36.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "undici": "^7.19.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "jest": "^30.2.0",
+    "jest-environment-jsdom": "^30.2.0",
+    "playwright": "^1.58.0",
+    "ts-jest": "^29.4.6",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}

@@ -1,0 +1,62 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Testing
+coverage
+.playwright-mcp
+playwright-report
+test-results
+
+# Project specific directories
+.claude
+opencode
+thoughts
+.ruff_cache
+screenshots
+
+# Documentation (exclude md files in docs, keep screenshots)
+docs/**/*.md
+
+# Temporary and test files
+package.temp.json
+metadata.json
+test-devtools.cjs
+*.bak
+
+# Temporary files
+*.tmp
+*.temp
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Cache
+.vite
+.cache
