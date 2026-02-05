@@ -27,7 +27,8 @@ import {
   generateNodeCoordinates,
   truncateGraphData
 } from '../utils/dataValidation';
-import { Play, X, Plus, Database, AlertCircle, Activity } from 'lucide-react';
+import { Play, X, Plus, Database, AlertCircle, Activity, Download } from 'lucide-react';
+import ImportExport from './ImportExport';
 
 interface OptimizedWorkspaceProps {
   config: ConnectionConfig;
@@ -66,6 +67,9 @@ const OptimizedWorkspace: React.FC<OptimizedWorkspaceProps> = ({
   const [schemaInfo, setSchemaInfo] = useState<SchemaInfo | null>(null);
   const [relSourceNode, setRelSourceNode] = useState<any>(null);
   const [cacheConfig, setCacheConfig] = useState<CacheConfig>(DEFAULT_CACHE_CONFIG);
+  
+  // Import/Export modal state
+  const [showImportExport, setShowImportExport] = useState(false);
 
   const [isGraphResult, setIsGraphResult] = useState(true);
   const [queryResult, setQueryResult] = useState<{ columns: string[]; rows: any[] } | null>(null);
@@ -433,6 +437,15 @@ const OptimizedWorkspace: React.FC<OptimizedWorkspaceProps> = ({
                 添加节点
               </button>
 
+              <button
+                onClick={() => setShowImportExport(true)}
+                disabled={isLoading}
+                className="flex items-center gap-2 px-4 py-2 rounded-md bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 transition-colors text-sm disabled:opacity-50"
+              >
+                <Download className="w-4 h-4" />
+                导入/导出
+              </button>
+
               {selectedNode && (
                 <div className="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-full bg-neo-bg/30 text-xs text-neo-dim">
                   <span>已选择：</span>
@@ -664,6 +677,17 @@ const OptimizedWorkspace: React.FC<OptimizedWorkspaceProps> = ({
         isLoading={isCreatingRel}
         error={createRelError}
       />
+
+      {/* Import/Export Modal */}
+      {showImportExport && (
+        <ImportExport
+          driver={driver}
+          database={config.database}
+          graphData={data}
+          onClose={() => setShowImportExport(false)}
+          onImportComplete={runQuery}
+        />
+      )}
     </div>
   );
 };

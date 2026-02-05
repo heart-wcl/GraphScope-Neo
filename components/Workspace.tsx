@@ -6,7 +6,8 @@ import AddNodeModal from './AddNodeModal';
 import AddRelationshipModal from './AddRelationshipModal';
 import QueryResultTable from './QueryResultTable';
 import ExecutionPlanView from './ExecutionPlanView';
-import { Play, Terminal, X, Search, Database, AlertCircle, Save, Edit2, Check, RotateCcw, Plus, Trash2, Table, FileText, Activity } from 'lucide-react';
+import ImportExport from './ImportExport';
+import { Play, Terminal, X, Search, Database, AlertCircle, Save, Edit2, Check, RotateCcw, Plus, Trash2, Table, FileText, Activity, Download } from 'lucide-react';
 
 interface WorkspaceProps {
   config: ConnectionConfig;
@@ -41,6 +42,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ config, onDisconnect, isActive })
   const [availableNodes, setAvailableNodes] = useState<Neo4jNode[]>([]);
   const [schemaInfo, setSchemaInfo] = useState<SchemaInfo | null>(null);
   const [relSourceNode, setRelSourceNode] = useState<Neo4jNode | null>(null);
+
+  // Import/Export modal state
+  const [showImportExport, setShowImportExport] = useState(false);
 
   // Query result type and data
   const [isGraphResult, setIsGraphResult] = useState(true);
@@ -396,6 +400,15 @@ const Workspace: React.FC<WorkspaceProps> = ({ config, onDisconnect, isActive })
                    <span className="hidden sm:inline">添加节点</span>
                  </button>
 
+                 <button
+                   onClick={() => setShowImportExport(true)}
+                   disabled={isLoading}
+                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                 >
+                   <Download className="w-3.5 h-3.5" />
+                   <span className="hidden sm:inline">导入/导出</span>
+                 </button>
+
                  {selectedNode && (
                     <div className="ml-auto flex items-center gap-2 px-2 py-1 rounded bg-neo-bg/30 text-xs text-neo-dim">
                       <span>已选择：</span>
@@ -649,6 +662,17 @@ const Workspace: React.FC<WorkspaceProps> = ({ config, onDisconnect, isActive })
           isLoading={isCreatingRel}
           error={createRelError}
         />
+
+        {/* Import/Export Modal */}
+        {showImportExport && (
+          <ImportExport
+            driver={driver}
+            database={config.database}
+            graphData={data}
+            onClose={() => setShowImportExport(false)}
+            onImportComplete={runQuery}
+          />
+        )}
      </div>
    );
  };
