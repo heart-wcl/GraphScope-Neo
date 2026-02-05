@@ -4,16 +4,24 @@ import {
   exportToCypher,
   exportToJSON,
   exportNodesToCsv,
+  exportToGraphML,
+  exportToGEXF,
+  exportToDOT,
+  exportToMarkdown,
+  exportToText,
+  exportToExcelCsv,
   importFromJSON,
   importNodesFromCsv,
   exportGraphData,
   ExportOptions,
-  ImportResult
+  ImportResult,
+  ExportFormat
 } from '../services/neo4j/import-export';
 import { getSchemaInfo, SchemaInfo } from '../services/neo4j';
 import {
   X, Download, Upload, FileText, FileJson, Table,
-  Loader2, AlertCircle, CheckCircle, Copy, Check
+  Loader2, AlertCircle, CheckCircle, Copy, Check,
+  FileCode, FileSpreadsheet, Share2, Code2
 } from 'lucide-react';
 
 interface ImportExportProps {
@@ -25,8 +33,21 @@ interface ImportExportProps {
 }
 
 type TabType = 'export' | 'import';
-type ExportFormat = 'cypher' | 'json' | 'csv';
+type LocalExportFormat = 'cypher' | 'json' | 'csv' | 'graphml' | 'gexf' | 'dot' | 'markdown' | 'text' | 'excel';
 type ImportFormat = 'json' | 'csv';
+
+// 导出格式配置
+const EXPORT_FORMATS: { id: LocalExportFormat; name: string; icon: React.ReactNode; description: string; extension: string }[] = [
+  { id: 'json', name: 'JSON', icon: <FileJson className="w-4 h-4" />, description: '标准 JSON 格式，方便程序处理', extension: 'json' },
+  { id: 'cypher', name: 'Cypher', icon: <FileText className="w-4 h-4" />, description: 'Neo4j 原生脚本，可直接导入', extension: 'cypher' },
+  { id: 'csv', name: 'CSV', icon: <Table className="w-4 h-4" />, description: '单标签节点导出，表格形式', extension: 'csv' },
+  { id: 'excel', name: 'Excel CSV', icon: <FileSpreadsheet className="w-4 h-4" />, description: '支持中文的 Excel 兼容格式', extension: 'csv' },
+  { id: 'graphml', name: 'GraphML', icon: <Share2 className="w-4 h-4" />, description: 'XML 标准图交换格式', extension: 'graphml' },
+  { id: 'gexf', name: 'GEXF', icon: <Share2 className="w-4 h-4" />, description: 'Gephi 软件支持的格式', extension: 'gexf' },
+  { id: 'dot', name: 'DOT', icon: <Code2 className="w-4 h-4" />, description: 'Graphviz 可视化格式', extension: 'dot' },
+  { id: 'markdown', name: 'Markdown', icon: <FileCode className="w-4 h-4" />, description: '人类可读的表格文档', extension: 'md' },
+  { id: 'text', name: '纯文本', icon: <FileText className="w-4 h-4" />, description: '简单文本格式，便于阅读', extension: 'txt' },
+];
 
 const ImportExport: React.FC<ImportExportProps> = ({
   driver,
@@ -42,13 +63,16 @@ const ImportExport: React.FC<ImportExportProps> = ({
   const [success, setSuccess] = useState<string | null>(null);
   
   // Export state
-  const [exportFormat, setExportFormat] = useState<ExportFormat>('json');
+  const [exportFormat, setExportFormat] = useState<LocalExportFormat>('json');
   const [exportResult, setExportResult] = useState<string>('');
+  const [exportResultExtra, setExportResultExtra] = useState<string>(''); // For Excel CSV relationships
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const [csvLabel, setCsvLabel] = useState('');
   const [csvProperties, setCsvProperties] = useState<string[]>([]);
   const [includeConstraints, setIncludeConstraints] = useState(true);
   const [includeIndexes, setIncludeIndexes] = useState(true);
+  const [includeProperties, setIncludeProperties] = useState(true);
+  const [includeStatistics, setIncludeStatistics] = useState(true);
   const [copied, setCopied] = useState(false);
   
   // Import state
@@ -79,23 +103,27 @@ const ImportExport: React.FC<ImportExportProps> = ({
     setLoading(true);
     setError(null);
     setExportResult('');
+    setExportResultExtra('');
 
     try {
       let result: string;
+      const commonOptions: ExportOptions = {
+        labels: selectedLabels.length > 0 ? selectedLabels : undefined,
+        includeProperties,
+        includeStatistics
+      };
 
       switch (exportFormat) {
         case 'cypher':
           result = await exportToCypher(driver, {
+            ...commonOptions,
             includeConstraints,
-            includeIndexes,
-            labels: selectedLabels.length > 0 ? selectedLabels : undefined
+            includeIndexes
           }, database);
           break;
           
         case 'json':
-          const jsonData = await exportToJSON(driver, {
-            labels: selectedLabels.length > 0 ? selectedLabels : undefined
-          }, database);
+          const jsonData = await exportToJSON(driver, commonOptions, database);
           result = JSON.stringify(jsonData, null, 2);
           break;
           
@@ -106,6 +134,32 @@ const ImportExport: React.FC<ImportExportProps> = ({
             return;
           }
           result = await exportNodesToCsv(driver, csvLabel, csvProperties, 10000, database);
+          break;
+          
+        case 'excel':
+          const excelData = await exportToExcelCsv(driver, commonOptions, database);
+          result = excelData.nodes;
+          setExportResultExtra(excelData.relationships);
+          break;
+          
+        case 'graphml':
+          result = await exportToGraphML(driver, commonOptions, database);
+          break;
+          
+        case 'gexf':
+          result = await exportToGEXF(driver, commonOptions, database);
+          break;
+          
+        case 'dot':
+          result = await exportToDOT(driver, commonOptions, database);
+          break;
+          
+        case 'markdown':
+          result = await exportToMarkdown(driver, commonOptions, database);
+          break;
+          
+        case 'text':
+          result = await exportToText(driver, commonOptions, database);
           break;
           
         default:
@@ -185,20 +239,21 @@ const ImportExport: React.FC<ImportExportProps> = ({
     reader.readAsText(file);
   };
 
-  const handleDownload = () => {
-    if (!exportResult) return;
+  const handleDownload = (content?: string, suffix?: string) => {
+    const data = content || exportResult;
+    if (!data) return;
 
-    const extensions: Record<ExportFormat, string> = {
-      cypher: 'cypher',
-      json: 'json',
-      csv: 'csv'
-    };
+    const formatConfig = EXPORT_FORMATS.find(f => f.id === exportFormat);
+    const extension = formatConfig?.extension || 'txt';
+    const filename = suffix 
+      ? `neo4j-export-${suffix}.${extension}`
+      : `neo4j-export.${extension}`;
 
-    const blob = new Blob([exportResult], { type: 'text/plain' });
+    const blob = new Blob([data], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `neo4j-export.${extensions[exportFormat]}`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -300,68 +355,80 @@ const ImportExport: React.FC<ImportExportProps> = ({
                 <label className="block text-xs font-bold text-neo-dim uppercase mb-2">
                   导出格式
                 </label>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setExportFormat('json')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                      exportFormat === 'json'
-                        ? 'bg-orange-500/20 border border-orange-400 text-orange-400'
-                        : 'bg-neo-bg border border-neo-border text-neo-dim hover:border-orange-400/50'
-                    }`}
-                  >
-                    <FileJson className="w-4 h-4" />
-                    JSON
-                  </button>
-                  <button
-                    onClick={() => setExportFormat('cypher')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                      exportFormat === 'cypher'
-                        ? 'bg-orange-500/20 border border-orange-400 text-orange-400'
-                        : 'bg-neo-bg border border-neo-border text-neo-dim hover:border-orange-400/50'
-                    }`}
-                  >
-                    <FileText className="w-4 h-4" />
-                    Cypher
-                  </button>
-                  <button
-                    onClick={() => setExportFormat('csv')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                      exportFormat === 'csv'
-                        ? 'bg-orange-500/20 border border-orange-400 text-orange-400'
-                        : 'bg-neo-bg border border-neo-border text-neo-dim hover:border-orange-400/50'
-                    }`}
-                  >
-                    <Table className="w-4 h-4" />
-                    CSV
-                  </button>
+                <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+                  {EXPORT_FORMATS.map(format => (
+                    <button
+                      key={format.id}
+                      onClick={() => setExportFormat(format.id)}
+                      className={`flex flex-col items-center gap-1 px-3 py-2.5 rounded-lg transition-colors ${
+                        exportFormat === format.id
+                          ? 'bg-orange-500/20 border border-orange-400 text-orange-400'
+                          : 'bg-neo-bg border border-neo-border text-neo-dim hover:border-orange-400/50'
+                      }`}
+                      title={format.description}
+                    >
+                      {format.icon}
+                      <span className="text-xs">{format.name}</span>
+                    </button>
+                  ))}
                 </div>
+                <p className="text-xs text-neo-dim mt-2">
+                  {EXPORT_FORMATS.find(f => f.id === exportFormat)?.description}
+                </p>
               </div>
 
               {/* Options */}
-              {exportFormat === 'cypher' && (
-                <div className="space-y-4">
-                  <div className="flex gap-4">
+              <div className="space-y-4 p-4 bg-neo-bg/50 rounded-xl border border-neo-border">
+                <div className="text-xs font-bold text-neo-dim uppercase mb-2">导出选项</div>
+                <div className="flex flex-wrap gap-4">
+                  {exportFormat === 'cypher' && (
+                    <>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={includeConstraints}
+                          onChange={(e) => setIncludeConstraints(e.target.checked)}
+                          className="rounded border-neo-border bg-neo-bg"
+                        />
+                        <span className="text-sm text-neo-text">包含约束</span>
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={includeIndexes}
+                          onChange={(e) => setIncludeIndexes(e.target.checked)}
+                          className="rounded border-neo-border bg-neo-bg"
+                        />
+                        <span className="text-sm text-neo-text">包含索引</span>
+                      </label>
+                    </>
+                  )}
+                  
+                  {['graphml', 'gexf', 'dot', 'text'].includes(exportFormat) && (
                     <label className="flex items-center gap-2">
                       <input
                         type="checkbox"
-                        checked={includeConstraints}
-                        onChange={(e) => setIncludeConstraints(e.target.checked)}
-                        className="rounded"
+                        checked={includeProperties}
+                        onChange={(e) => setIncludeProperties(e.target.checked)}
+                        className="rounded border-neo-border bg-neo-bg"
                       />
-                      <span className="text-sm text-neo-text">包含约束</span>
+                      <span className="text-sm text-neo-text">包含属性详情</span>
                     </label>
+                  )}
+                  
+                  {['markdown', 'text'].includes(exportFormat) && (
                     <label className="flex items-center gap-2">
                       <input
                         type="checkbox"
-                        checked={includeIndexes}
-                        onChange={(e) => setIncludeIndexes(e.target.checked)}
-                        className="rounded"
+                        checked={includeStatistics}
+                        onChange={(e) => setIncludeStatistics(e.target.checked)}
+                        className="rounded border-neo-border bg-neo-bg"
                       />
-                      <span className="text-sm text-neo-text">包含索引</span>
+                      <span className="text-sm text-neo-text">包含统计信息</span>
                     </label>
-                  </div>
+                  )}
                 </div>
-              )}
+              </div>
 
               {exportFormat === 'csv' && schema && (
                 <div className="space-y-4">
@@ -470,31 +537,57 @@ const ImportExport: React.FC<ImportExportProps> = ({
 
               {/* Result */}
               {exportResult && (
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs font-bold text-neo-dim uppercase">导出结果</label>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleCopy}
-                        className="flex items-center gap-1 px-3 py-1 text-sm text-neo-dim hover:text-white transition-colors"
-                      >
-                        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                        {copied ? '已复制' : '复制'}
-                      </button>
-                      <button
-                        onClick={handleDownload}
-                        className="flex items-center gap-1 px-3 py-1 text-sm text-orange-400 hover:text-orange-300 transition-colors"
-                      >
-                        <Download className="w-4 h-4" />
-                        下载
-                      </button>
+                <div className="space-y-4">
+                  {/* Main result */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-bold text-neo-dim uppercase">
+                        {exportFormat === 'excel' ? '节点数据' : '导出结果'}
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleCopy}
+                          className="flex items-center gap-1 px-3 py-1 text-sm text-neo-dim hover:text-white transition-colors"
+                        >
+                          {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                          {copied ? '已复制' : '复制'}
+                        </button>
+                        <button
+                          onClick={() => handleDownload(undefined, exportFormat === 'excel' ? 'nodes' : undefined)}
+                          className="flex items-center gap-1 px-3 py-1 text-sm text-orange-400 hover:text-orange-300 transition-colors"
+                        >
+                          <Download className="w-4 h-4" />
+                          下载
+                        </button>
+                      </div>
                     </div>
+                    <textarea
+                      value={exportResult}
+                      readOnly
+                      className="w-full h-48 bg-neo-bg border border-neo-border rounded-lg p-4 text-sm text-neo-text font-mono resize-none custom-scrollbar"
+                    />
                   </div>
-                  <textarea
-                    value={exportResult}
-                    readOnly
-                    className="w-full h-64 bg-neo-bg border border-neo-border rounded-lg p-4 text-sm text-neo-text font-mono resize-none custom-scrollbar"
-                  />
+                  
+                  {/* Extra result for Excel CSV (relationships) */}
+                  {exportFormat === 'excel' && exportResultExtra && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs font-bold text-neo-dim uppercase">关系数据</label>
+                        <button
+                          onClick={() => handleDownload(exportResultExtra, 'relationships')}
+                          className="flex items-center gap-1 px-3 py-1 text-sm text-orange-400 hover:text-orange-300 transition-colors"
+                        >
+                          <Download className="w-4 h-4" />
+                          下载
+                        </button>
+                      </div>
+                      <textarea
+                        value={exportResultExtra}
+                        readOnly
+                        className="w-full h-32 bg-neo-bg border border-neo-border rounded-lg p-4 text-sm text-neo-text font-mono resize-none custom-scrollbar"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
