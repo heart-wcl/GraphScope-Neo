@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { PerformanceMetrics } from '../types';
 import { Activity, Cpu, HardDrive, Zap, Layers, Network, GripVertical } from 'lucide-react';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface PerformanceMonitorProps {
   metrics: PerformanceMetrics | null;
@@ -18,11 +19,17 @@ const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
   isVisible,
   onToggle
 }) => {
+  const { theme } = useTheme();
   const [history, setHistory] = useState<number[]>([]);
   const [position, setPosition] = useState({ x: 16, y: window.innerHeight - 300 });
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  
+  // 主题适配颜色
+  const textColor = theme === 'dark' ? 'text-white' : 'text-gray-900';
+  const textMutedColor = theme === 'dark' ? 'text-neo-dim' : 'text-gray-600';
+  const bgColor = theme === 'dark' ? 'bg-neo-bg/50' : 'bg-gray-100';
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -116,9 +123,9 @@ const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
         onMouseDown={handleMouseDown}
       >
         <div className="flex items-center gap-2">
-          <GripVertical className="w-3 h-3 text-neo-dim" />
+          <GripVertical className={`w-3 h-3 ${textMutedColor}`} />
           <Activity className="w-4 h-4 text-neo-primary" />
-          <span className="text-xs font-bold text-white">性能监控</span>
+          <span className={`text-xs font-bold ${textColor}`}>性能监控</span>
         </div>
         <button
           onClick={onToggle}
@@ -137,7 +144,7 @@ const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <Zap className="w-3.5 h-3.5 text-neo-primary" />
-            <span className="text-[10px] text-neo-dim">帧率 (FPS)</span>
+            <span className={`text-[10px] ${textMutedColor}`}>帧率 (FPS)</span>
           </div>
           <span className={`text-sm font-bold ${getFpsColor(metrics.fps)}`}>
             {metrics.fps.toFixed(1)}
@@ -145,7 +152,7 @@ const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
         </div>
 
         {/* FPS Chart */}
-        <div className="h-8 bg-neo-bg rounded-lg p-1">
+        <div className={`h-8 ${bgColor} rounded-lg p-1`}>
           <svg width="100%" height="100%" viewBox="0 0 220 24" preserveAspectRatio="none">
             <polyline
               fill="none"
@@ -162,15 +169,15 @@ const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
 
         {/* Memory & Render Time - Side by side */}
         <div className="grid grid-cols-2 gap-2">
-          <div className="flex items-center justify-between bg-neo-bg/50 rounded px-2 py-1">
+          <div className={`flex items-center justify-between ${bgColor} rounded px-2 py-1`}>
             <HardDrive className="w-3 h-3 text-neo-secondary" />
             <span className={`text-xs font-bold ${getMemoryColor(metrics.memory)}`}>
               {metrics.memory.toFixed(1)} MB
             </span>
           </div>
-          <div className="flex items-center justify-between bg-neo-bg/50 rounded px-2 py-1">
+          <div className={`flex items-center justify-between ${bgColor} rounded px-2 py-1`}>
             <Cpu className="w-3 h-3 text-orange-400" />
-            <span className="text-xs font-bold text-white">
+            <span className={`text-xs font-bold ${textColor}`}>
               {metrics.renderTime.toFixed(2)} ms
             </span>
           </div>
@@ -178,28 +185,28 @@ const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
 
         {/* Stats Grid */}
         <div className="border-t border-neo-border pt-2 grid grid-cols-3 gap-1.5 text-center">
-          <div className="bg-neo-bg/50 rounded px-1.5 py-1">
+          <div className={`${bgColor} rounded px-1.5 py-1`}>
             <div className="flex items-center justify-center gap-1 mb-0.5">
               <Layers className="w-3 h-3 text-blue-400" />
-              <span className="text-[9px] text-neo-dim">节点</span>
+              <span className={`text-[9px] ${textMutedColor}`}>节点</span>
             </div>
-            <span className="text-[10px] font-medium text-white">
+            <span className={`text-[10px] font-medium ${textColor}`}>
               {metrics.visibleNodes} / {metrics.totalNodes}
             </span>
           </div>
-          <div className="bg-neo-bg/50 rounded px-1.5 py-1">
+          <div className={`${bgColor} rounded px-1.5 py-1`}>
             <div className="flex items-center justify-center gap-1 mb-0.5">
               <Network className="w-3 h-3 text-purple-400" />
-              <span className="text-[9px] text-neo-dim">关系</span>
+              <span className={`text-[9px] ${textMutedColor}`}>关系</span>
             </div>
-            <span className="text-[10px] font-medium text-white">
+            <span className={`text-[10px] font-medium ${textColor}`}>
               {metrics.visibleLinks} / {metrics.totalLinks}
             </span>
           </div>
-          <div className="bg-neo-bg/50 rounded px-1.5 py-1">
+          <div className={`${bgColor} rounded px-1.5 py-1`}>
             <div className="flex items-center justify-center gap-1 mb-0.5">
               <Activity className="w-3 h-3 text-green-400" />
-              <span className="text-[9px] text-neo-dim">裁剪</span>
+              <span className={`text-[9px] ${textMutedColor}`}>裁剪</span>
             </div>
             <span className={`text-[10px] font-bold ${getCullRateColor(metrics.cullRate)}`}>
               {(metrics.cullRate * 100).toFixed(1)}%
