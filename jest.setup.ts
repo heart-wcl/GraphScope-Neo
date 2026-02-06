@@ -35,10 +35,10 @@ global.ResizeObserver = class ResizeObserver {
 } as any;
 
 // Mock requestAnimationFrame
-global.requestAnimationFrame = (callback: FrameRequestCallback) => {
+(global as any).requestAnimationFrame = (callback: FrameRequestCallback) => {
   return setTimeout(callback, 0);
-} as any;
+};
 
-global.cancelAnimationFrame = (id: number) => {
+(global as any).cancelAnimationFrame = (id: number) => {
   clearTimeout(id);
-} as any;
+};

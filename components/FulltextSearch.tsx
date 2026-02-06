@@ -12,9 +12,12 @@ import {
 } from '../services/neo4j/fulltext';
 import { getSchemaInfo, SchemaInfo } from '../services/neo4j';
 import {
-  X, Search, Plus, Trash2, Loader2, FileText,
-  ChevronDown, ChevronRight, AlertCircle, Star, Settings
+  Search, Plus, Trash2, Loader2, FileText, Star
 } from 'lucide-react';
+import { Modal } from '../presentation/components/common/Modal';
+import { ErrorAlert } from '../presentation/components/common/Alert';
+import { LoadingOverlay, LoadingButton } from '../presentation/components/common/Loading';
+import { EmptyState } from '../presentation/components/common/Empty';
 
 interface FulltextSearchProps {
   driver: Driver | null;
@@ -34,7 +37,6 @@ const FulltextSearch: React.FC<FulltextSearchProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Search state
   const [selectedIndex, setSelectedIndex] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -43,7 +45,6 @@ const FulltextSearch: React.FC<FulltextSearchProps> = ({
   const [searchMode, setSearchMode] = useState<'normal' | 'fuzzy'>('normal');
   const [fuzziness, setFuzziness] = useState(2);
   
-  // Create index state
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newIndex, setNewIndex] = useState({
@@ -61,10 +62,8 @@ const FulltextSearch: React.FC<FulltextSearchProps> = ({
 
   const loadData = async () => {
     if (!driver) return;
-
     setLoading(true);
     setError(null);
-
     try {
       const [indexesData, schemaData] = await Promise.all([
         getFulltextIndexes(driver, database),
@@ -72,12 +71,8 @@ const FulltextSearch: React.FC<FulltextSearchProps> = ({
       ]);
       setIndexes(indexesData);
       setSchema(schemaData);
-      
-      // Auto-select first node index
       const nodeIndex = indexesData.find(i => i.entityType === 'NODE');
-      if (nodeIndex) {
-        setSelectedIndex(nodeIndex.name);
-      }
+      if (nodeIndex) setSelectedIndex(nodeIndex.name);
     } catch (err) {
       setError(`加载失败: ${err instanceof Error ? err.message : '未知错误'}`);
     } finally {
@@ -86,43 +81,21 @@ const FulltextSearch: React.FC<FulltextSearchProps> = ({
   };
 
   const handleSearch = async () => {
-    console.log('[FulltextSearch] handleSearch called', { driver: !!driver, selectedIndex, searchTerm });
-    
-    if (!driver) {
-      console.log('[FulltextSearch] No driver');
-      setError('没有数据库连接');
+    if (!driver || !selectedIndex || !searchTerm.trim()) {
+      if (!driver) setError('没有数据库连接');
+      else if (!selectedIndex) setError('请先选择一个索引');
+      else if (!searchTerm.trim()) setError('请输入搜索词');
       return;
     }
-    if (!selectedIndex) {
-      console.log('[FulltextSearch] No index selected');
-      setError('请先选择一个索引');
-      return;
-    }
-    if (!searchTerm.trim()) {
-      console.log('[FulltextSearch] No search term');
-      setError('请输入搜索词');
-      return;
-    }
-
     setSearching(true);
     setError(null);
-
     try {
-      let results: SearchResult[];
-      
-      console.log('[FulltextSearch] Searching with', { mode: searchMode, index: selectedIndex, term: searchTerm });
-      
-      if (searchMode === 'fuzzy') {
-        results = await fuzzySearchNodes(driver, selectedIndex, searchTerm, fuzziness, 50, database);
-      } else {
-        results = await fulltextSearchNodes(driver, selectedIndex, searchTerm, 50, database);
-      }
-      
-      console.log('[FulltextSearch] Search results:', results.length);
+      const results = searchMode === 'fuzzy'
+        ? await fuzzySearchNodes(driver, selectedIndex, searchTerm, fuzziness, 50, database)
+        : await fulltextSearchNodes(driver, selectedIndex, searchTerm, 50, database);
       setSearchResults(results);
       setHasSearched(true);
     } catch (err) {
-      console.error('[FulltextSearch] Search error:', err);
       setError(`搜索失败: ${err instanceof Error ? err.message : '未知错误'}`);
     } finally {
       setSearching(false);
@@ -131,20 +104,10 @@ const FulltextSearch: React.FC<FulltextSearchProps> = ({
 
   const handleCreateIndex = async () => {
     if (!driver || !newIndex.name || newIndex.labels.length === 0 || newIndex.properties.length === 0) return;
-
     setCreating(true);
     setError(null);
-
     try {
-      await createNodeFulltextIndex(
-        driver,
-        newIndex.name,
-        newIndex.labels,
-        newIndex.properties,
-        newIndex.analyzer,
-        database
-      );
-      
+      await createNodeFulltextIndex(driver, newIndex.name, newIndex.labels, newIndex.properties, newIndex.analyzer, database);
       await loadData();
       setShowCreateForm(false);
       setNewIndex({ name: '', labels: [], properties: [], analyzer: 'standard-no-stop-words' });
@@ -157,7 +120,6 @@ const FulltextSearch: React.FC<FulltextSearchProps> = ({
 
   const handleDeleteIndex = async (indexName: string) => {
     if (!driver) return;
-
     try {
       await dropFulltextIndex(driver, indexName, database);
       await loadData();
@@ -173,351 +135,215 @@ const FulltextSearch: React.FC<FulltextSearchProps> = ({
   const toggleLabel = (label: string) => {
     setNewIndex(prev => ({
       ...prev,
-      labels: prev.labels.includes(label)
-        ? prev.labels.filter(l => l !== label)
-        : [...prev.labels, label]
+      labels: prev.labels.includes(label) ? prev.labels.filter(l => l !== label) : [...prev.labels, label]
     }));
   };
 
   const toggleProperty = (prop: string) => {
     setNewIndex(prev => ({
       ...prev,
-      properties: prev.properties.includes(prop)
-        ? prev.properties.filter(p => p !== prop)
-        : [...prev.properties, prop]
+      properties: prev.properties.includes(prop) ? prev.properties.filter(p => p !== prop) : [...prev.properties, prop]
     }));
   };
 
-  // Get all unique properties from selected labels
   const availableProperties = schema?.labels
     .filter(l => newIndex.labels.includes(l.label))
     .flatMap(l => l.properties)
     .filter((p, i, arr) => arr.indexOf(p) === i) || [];
 
   if (loading) {
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" style={{ zIndex: 100 }}>
-        <div className="glass-panel rounded-2xl p-8 flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-neo-primary border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-white font-medium">加载中...</span>
-        </div>
-      </div>
-    );
+    return <LoadingOverlay text="加载中..." />;
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4" style={{ zIndex: 100 }}>
-      <div className="glass-panel rounded-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden animate-fade-in">
-        {/* Header */}
-        <div className="p-4 md:p-6 border-b border-neo-border flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-neo-secondary/10 flex items-center justify-center">
-              <Search className="w-5 h-5 text-neo-secondary" />
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="全文搜索"
+      description={`${indexes.length} 个全文索引`}
+      icon={<Search className="w-5 h-5 text-neo-secondary" />}
+      iconColorClass="bg-neo-secondary/10"
+      size="4xl"
+      contentClassName="flex overflow-hidden"
+    >
+      {/* Header Actions */}
+      <div className="absolute top-4 right-16 z-10">
+        <button
+          onClick={() => setShowCreateForm(!showCreateForm)}
+          className="flex items-center gap-2 px-3 py-2 bg-neo-secondary/20 hover:bg-neo-secondary/30 text-neo-secondary rounded-lg transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          <span className="text-sm">新建索引</span>
+        </button>
+      </div>
+
+      {/* Create Form */}
+      {showCreateForm && (
+        <div className="p-4 border-b border-neo-border bg-neo-bg/50 w-full">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-neo-dim uppercase mb-1.5">索引名称</label>
+                <input type="text" value={newIndex.name} onChange={(e) => setNewIndex({ ...newIndex, name: e.target.value })}
+                  placeholder="my_fulltext_index"
+                  className="w-full bg-neo-bg border border-neo-border rounded-lg px-3 py-2 text-white placeholder-neo-dim/50 focus:ring-1 focus:ring-neo-secondary outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-neo-dim uppercase mb-1.5">分析器</label>
+                <select value={newIndex.analyzer} onChange={(e) => setNewIndex({ ...newIndex, analyzer: e.target.value })}
+                  className="w-full bg-neo-bg border border-neo-border rounded-lg px-3 py-2 text-white focus:ring-1 focus:ring-neo-secondary outline-none">
+                  {analyzers.slice(0, 10).map(a => (<option key={a.name} value={a.name}>{a.description}</option>))}
+                </select>
+              </div>
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">全文搜索</h2>
-              <p className="text-xs text-neo-dim">
-                {indexes.length} 个全文索引
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowCreateForm(!showCreateForm)}
-              className="flex items-center gap-2 px-3 py-2 bg-neo-secondary/20 hover:bg-neo-secondary/30 text-neo-secondary rounded-lg transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              <span className="text-sm">新建索引</span>
-            </button>
-            <button onClick={onClose} className="text-neo-dim hover:text-white p-2">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Create Form */}
-        {showCreateForm && (
-          <div className="p-4 border-b border-neo-border bg-neo-bg/50">
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Index Name */}
-                <div>
-                  <label className="block text-xs font-bold text-neo-dim uppercase mb-1.5">
-                    索引名称
-                  </label>
-                  <input
-                    type="text"
-                    value={newIndex.name}
-                    onChange={(e) => setNewIndex({ ...newIndex, name: e.target.value })}
-                    placeholder="my_fulltext_index"
-                    className="w-full bg-neo-bg border border-neo-border rounded-lg px-3 py-2 text-white placeholder-neo-dim/50 focus:ring-1 focus:ring-neo-secondary outline-none"
-                  />
-                </div>
-
-                {/* Analyzer */}
-                <div>
-                  <label className="block text-xs font-bold text-neo-dim uppercase mb-1.5">
-                    分析器
-                  </label>
-                  <select
-                    value={newIndex.analyzer}
-                    onChange={(e) => setNewIndex({ ...newIndex, analyzer: e.target.value })}
-                    className="w-full bg-neo-bg border border-neo-border rounded-lg px-3 py-2 text-white focus:ring-1 focus:ring-neo-secondary outline-none"
-                  >
-                    {analyzers.slice(0, 10).map(a => (
-                      <option key={a.name} value={a.name}>{a.description}</option>
-                    ))}
-                  </select>
-                </div>
+              <label className="block text-xs font-bold text-neo-dim uppercase mb-1.5">节点标签 (可多选)</label>
+              <div className="flex flex-wrap gap-2">
+                {schema?.labels.map(l => (
+                  <button key={l.label} onClick={() => toggleLabel(l.label)}
+                    className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${newIndex.labels.includes(l.label) ? 'bg-neo-secondary text-black' : 'bg-neo-bg border border-neo-border text-neo-dim hover:border-neo-secondary'}`}>
+                    {l.label}
+                  </button>
+                ))}
               </div>
-
-              {/* Labels Selection */}
+            </div>
+            {newIndex.labels.length > 0 && (
               <div>
-                <label className="block text-xs font-bold text-neo-dim uppercase mb-1.5">
-                  节点标签 (可多选)
-                </label>
+                <label className="block text-xs font-bold text-neo-dim uppercase mb-1.5">索引属性 (可多选)</label>
                 <div className="flex flex-wrap gap-2">
-                  {schema?.labels.map(l => (
-                    <button
-                      key={l.label}
-                      onClick={() => toggleLabel(l.label)}
-                      className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                        newIndex.labels.includes(l.label)
-                          ? 'bg-neo-secondary text-black'
-                          : 'bg-neo-bg border border-neo-border text-neo-dim hover:border-neo-secondary'
-                      }`}
-                    >
-                      {l.label}
+                  {availableProperties.map(p => (
+                    <button key={p} onClick={() => toggleProperty(p)}
+                      className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${newIndex.properties.includes(p) ? 'bg-neo-primary text-black' : 'bg-neo-bg border border-neo-border text-neo-dim hover:border-neo-primary'}`}>
+                      {p}
                     </button>
                   ))}
                 </div>
               </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowCreateForm(false)} className="px-4 py-2 text-neo-dim hover:text-white transition-colors">取消</button>
+              <LoadingButton onClick={handleCreateIndex} loading={creating}
+                disabled={!newIndex.name || newIndex.labels.length === 0 || newIndex.properties.length === 0}
+                loadingText="创建中..." icon={<Plus className="w-4 h-4" />}
+                className="px-4 py-2 bg-neo-secondary hover:bg-white text-black font-medium rounded-lg transition-colors">
+                创建索引
+              </LoadingButton>
+            </div>
+          </div>
+        </div>
+      )}
 
-              {/* Properties Selection */}
-              {newIndex.labels.length > 0 && (
-                <div>
-                  <label className="block text-xs font-bold text-neo-dim uppercase mb-1.5">
-                    索引属性 (可多选)
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {availableProperties.map(p => (
-                      <button
-                        key={p}
-                        onClick={() => toggleProperty(p)}
-                        className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                          newIndex.properties.includes(p)
-                            ? 'bg-neo-primary text-black'
-                            : 'bg-neo-bg border border-neo-border text-neo-dim hover:border-neo-primary'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    ))}
+      <ErrorAlert message={error} dismissible onDismiss={() => setError(null)} />
+
+      {/* Main Content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left: Index List */}
+        <div className="w-64 border-r border-neo-border p-4 overflow-y-auto custom-scrollbar">
+          <h3 className="text-xs font-bold text-neo-dim uppercase mb-3">索引列表</h3>
+          {indexes.length === 0 ? (
+            <p className="text-neo-dim text-sm">暂无全文索引</p>
+          ) : (
+            <div className="space-y-2">
+              {indexes.filter(i => i.entityType === 'NODE').map(index => (
+                <div key={index.name}
+                  className={`p-3 rounded-lg cursor-pointer transition-colors group ${selectedIndex === index.name ? 'bg-neo-secondary/20 border border-neo-secondary' : 'bg-neo-bg border border-neo-border hover:border-neo-secondary/50'}`}
+                  onClick={() => setSelectedIndex(index.name)}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-neo-secondary" />
+                      <span className="text-sm text-white font-medium truncate">{index.name}</span>
+                    </div>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteIndex(index.name); }}
+                      className="p-1 text-neo-dim hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
                   </div>
+                  <div className="mt-1 text-xs text-neo-dim">{index.labelsOrTypes.join(', ')}</div>
+                  <div className="mt-1 text-xs text-neo-dim">属性: {index.properties.join(', ')}</div>
                 </div>
-              )}
+              ))}
+            </div>
+          )}
+        </div>
 
-              {/* Actions */}
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => setShowCreateForm(false)}
-                  className="px-4 py-2 text-neo-dim hover:text-white transition-colors"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={handleCreateIndex}
-                  disabled={creating || !newIndex.name || newIndex.labels.length === 0 || newIndex.properties.length === 0}
-                  className="flex items-center gap-2 px-4 py-2 bg-neo-secondary hover:bg-white text-black font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {creating ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      创建中...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4" />
-                      创建索引
-                    </>
-                  )}
-                </button>
+        {/* Right: Search */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="p-4 border-b border-neo-border">
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-2.5 w-4 h-4 text-neo-dim" />
+                <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()} placeholder="输入搜索词..."
+                  className="w-full bg-neo-bg border border-neo-border rounded-lg py-2 pl-10 pr-4 text-white placeholder-neo-dim focus:ring-1 focus:ring-neo-secondary outline-none"
+                  disabled={!selectedIndex} />
+              </div>
+              <div className="flex items-center gap-2">
+                <select value={searchMode} onChange={(e) => setSearchMode(e.target.value as 'normal' | 'fuzzy')}
+                  className="bg-neo-bg border border-neo-border rounded-lg px-3 py-2 text-white text-sm focus:ring-1 focus:ring-neo-secondary outline-none">
+                  <option value="normal">精确搜索</option>
+                  <option value="fuzzy">模糊搜索</option>
+                </select>
+                {searchMode === 'fuzzy' && (
+                  <select value={fuzziness} onChange={(e) => setFuzziness(parseInt(e.target.value))}
+                    className="bg-neo-bg border border-neo-border rounded-lg px-2 py-2 text-white text-sm focus:ring-1 focus:ring-neo-secondary outline-none">
+                    <option value={1}>容错 1</option>
+                    <option value={2}>容错 2</option>
+                    <option value={3}>容错 3</option>
+                  </select>
+                )}
+                <LoadingButton onClick={handleSearch} loading={searching}
+                  disabled={!selectedIndex || !searchTerm.trim()} icon={<Search className="w-4 h-4" />}
+                  className="px-4 py-2 bg-neo-secondary hover:bg-white text-black font-medium rounded-lg transition-colors">
+                  搜索
+                </LoadingButton>
               </div>
             </div>
           </div>
-        )}
 
-        {/* Error */}
-        {error && (
-          <div className="p-4 bg-red-500/10 border-b border-neo-border flex items-center gap-2 text-red-400">
-            <AlertCircle className="w-4 h-4" />
-            <span className="text-sm">{error}</span>
-          </div>
-        )}
-
-        {/* Main Content */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Left: Index List */}
-          <div className="w-64 border-r border-neo-border p-4 overflow-y-auto custom-scrollbar">
-            <h3 className="text-xs font-bold text-neo-dim uppercase mb-3">索引列表</h3>
-            {indexes.length === 0 ? (
-              <p className="text-neo-dim text-sm">暂无全文索引</p>
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
+            {!selectedIndex ? (
+              <EmptyState icon={<Search className="w-12 h-12" />} title="请先选择一个索引" />
+            ) : !hasSearched ? (
+              <EmptyState icon={<Search className="w-12 h-12" />} title="输入搜索词开始搜索" />
+            ) : searchResults.length === 0 ? (
+              <EmptyState icon={<Search className="w-12 h-12" />} title="未找到匹配结果" description="尝试使用不同的搜索词或模糊搜索" />
             ) : (
-              <div className="space-y-2">
-                {indexes.filter(i => i.entityType === 'NODE').map(index => (
-                  <div
-                    key={index.name}
-                    className={`p-3 rounded-lg cursor-pointer transition-colors group ${
-                      selectedIndex === index.name
-                        ? 'bg-neo-secondary/20 border border-neo-secondary'
-                        : 'bg-neo-bg border border-neo-border hover:border-neo-secondary/50'
-                    }`}
-                    onClick={() => setSelectedIndex(index.name)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-neo-secondary" />
-                        <span className="text-sm text-white font-medium truncate">{index.name}</span>
+              <div className="space-y-3">
+                <div className="text-sm text-neo-dim mb-4">找到 {searchResults.length} 个结果</div>
+                {searchResults.map((result, idx) => (
+                  <div key={`${result.node.id}-${idx}`}
+                    className="bg-neo-bg rounded-lg border border-neo-border p-4 hover:border-neo-secondary/50 transition-colors cursor-pointer"
+                    onClick={() => onSelectNode?.(result.node)}>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-white font-medium">{result.node.labels.join(', ')}</span>
+                          <span className="text-xs text-neo-dim">ID: {result.node.id}</span>
+                        </div>
+                        <div className="mt-2 text-sm text-neo-dim">
+                          {Object.entries(result.node.properties).slice(0, 5).map(([key, value]) => (
+                            <div key={key} className="flex gap-2">
+                              <span className="text-neo-primary">{key}:</span>
+                              <span className="text-neo-text truncate max-w-md">
+                                {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteIndex(index.name);
-                        }}
-                        className="p-1 text-neo-dim hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                    <div className="mt-1 text-xs text-neo-dim">
-                      {index.labelsOrTypes.join(', ')}
-                    </div>
-                    <div className="mt-1 text-xs text-neo-dim">
-                      属性: {index.properties.join(', ')}
+                      <div className="flex items-center gap-1 text-neo-secondary">
+                        <Star className="w-4 h-4" />
+                        <span className="text-sm">{result.score.toFixed(3)}</span>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
-
-          {/* Right: Search */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            {/* Search Bar */}
-            <div className="p-4 border-b border-neo-border">
-              <div className="flex gap-2">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-neo-dim" />
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    placeholder="输入搜索词..."
-                    className="w-full bg-neo-bg border border-neo-border rounded-lg py-2 pl-10 pr-4 text-white placeholder-neo-dim focus:ring-1 focus:ring-neo-secondary outline-none"
-                    disabled={!selectedIndex}
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={searchMode}
-                    onChange={(e) => setSearchMode(e.target.value as 'normal' | 'fuzzy')}
-                    className="bg-neo-bg border border-neo-border rounded-lg px-3 py-2 text-white text-sm focus:ring-1 focus:ring-neo-secondary outline-none"
-                  >
-                    <option value="normal">精确搜索</option>
-                    <option value="fuzzy">模糊搜索</option>
-                  </select>
-                  {searchMode === 'fuzzy' && (
-                    <select
-                      value={fuzziness}
-                      onChange={(e) => setFuzziness(parseInt(e.target.value))}
-                      className="bg-neo-bg border border-neo-border rounded-lg px-2 py-2 text-white text-sm focus:ring-1 focus:ring-neo-secondary outline-none"
-                    >
-                      <option value={1}>容错 1</option>
-                      <option value={2}>容错 2</option>
-                      <option value={3}>容错 3</option>
-                    </select>
-                  )}
-                  <button
-                    onClick={handleSearch}
-                    disabled={searching || !selectedIndex || !searchTerm.trim()}
-                    className="flex items-center gap-2 px-4 py-2 bg-neo-secondary hover:bg-white text-black font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {searching ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Search className="w-4 h-4" />
-                    )}
-                    搜索
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Results */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
-              {!selectedIndex ? (
-                <div className="text-center py-12">
-                  <Search className="w-12 h-12 text-neo-dim mx-auto mb-4" />
-                  <p className="text-neo-dim">请先选择一个索引</p>
-                </div>
-              ) : !hasSearched ? (
-                <div className="text-center py-12">
-                  <Search className="w-12 h-12 text-neo-dim mx-auto mb-4" />
-                  <p className="text-neo-dim">输入搜索词开始搜索</p>
-                </div>
-              ) : searchResults.length === 0 ? (
-                <div className="text-center py-12">
-                  <Search className="w-12 h-12 text-neo-dim mx-auto mb-4" />
-                  <p className="text-neo-dim">未找到匹配结果</p>
-                  <p className="text-neo-dim text-sm mt-2">尝试使用不同的搜索词或模糊搜索</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="text-sm text-neo-dim mb-4">
-                    找到 {searchResults.length} 个结果
-                  </div>
-                  {searchResults.map((result, idx) => (
-                    <div
-                      key={`${result.node.id}-${idx}`}
-                      className="bg-neo-bg rounded-lg border border-neo-border p-4 hover:border-neo-secondary/50 transition-colors cursor-pointer"
-                      onClick={() => onSelectNode?.(result.node)}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-white font-medium">
-                              {result.node.labels.join(', ')}
-                            </span>
-                            <span className="text-xs text-neo-dim">
-                              ID: {result.node.id}
-                            </span>
-                          </div>
-                          <div className="mt-2 text-sm text-neo-dim">
-                            {Object.entries(result.node.properties).slice(0, 5).map(([key, value]) => (
-                              <div key={key} className="flex gap-2">
-                                <span className="text-neo-primary">{key}:</span>
-                                <span className="text-neo-text truncate max-w-md">
-                                  {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 text-neo-secondary">
-                          <Star className="w-4 h-4" />
-                          <span className="text-sm">{result.score.toFixed(3)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };
 

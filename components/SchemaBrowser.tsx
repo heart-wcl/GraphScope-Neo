@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { SchemaInfo, NodeLabel, RelationshipType, getSchemaInfo } from '../services/neo4j';
 import { Driver } from '../types';
-import { X, Database, GitBranch, Layers, Search, ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
+import { Database, GitBranch, Layers, Search, ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
+import { Modal } from '../presentation/components/common/Modal';
+import { ErrorAlert } from '../presentation/components/common/Alert';
+import { LoadingOverlay } from '../presentation/components/common/Loading';
+import { EmptyState } from '../presentation/components/common/Empty';
 
 interface SchemaBrowserProps {
   driver: Driver | null;
@@ -26,16 +30,12 @@ const SchemaBrowser: React.FC<SchemaBrowserProps> = ({
   const [copiedLabel, setCopiedLabel] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
 
-  useEffect(() => {
-    loadSchema();
-  }, [driver, database]);
+  useEffect(() => { loadSchema(); }, [driver, database]);
 
   const loadSchema = async () => {
     if (!driver) return;
-
     setLoading(true);
     setError(null);
-
     try {
       const schemaInfo = await getSchemaInfo(driver, database);
       setSchema(schemaInfo);
@@ -48,21 +48,13 @@ const SchemaBrowser: React.FC<SchemaBrowserProps> = ({
 
   const toggleLabel = (label: string) => {
     const newExpanded = new Set(expandedLabels);
-    if (newExpanded.has(label)) {
-      newExpanded.delete(label);
-    } else {
-      newExpanded.add(label);
-    }
+    newExpanded.has(label) ? newExpanded.delete(label) : newExpanded.add(label);
     setExpandedLabels(newExpanded);
   };
 
   const toggleRel = (type: string) => {
     const newExpanded = new Set(expandedRels);
-    if (newExpanded.has(type)) {
-      newExpanded.delete(type);
-    } else {
-      newExpanded.add(type);
-    }
+    newExpanded.has(type) ? newExpanded.delete(type) : newExpanded.add(type);
     setExpandedRels(newExpanded);
   };
 
@@ -94,176 +86,148 @@ const SchemaBrowser: React.FC<SchemaBrowserProps> = ({
   };
 
   if (loading) {
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-80">
-        <div className="glass-panel rounded-2xl p-8 flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-neo-primary border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-white font-medium">加载模式中...</span>
-        </div>
-      </div>
-    );
+    return <LoadingOverlay text="加载模式中..." />;
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-80 p-4">
-      <div className="glass-panel rounded-2xl w-full max-w-4xl max-h-[80vh] flex flex-col overflow-hidden animate-fade-in">
-        {/* Header */}
-        <div className="p-4 md:p-6 border-b border-neo-border flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-neo-primary/10 flex items-center justify-center">
-              <Database className="w-5 h-5 text-neo-primary" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-white">数据库模式</h2>
-              <p className="text-xs text-neo-dim">
-                {schema?.labels.length || 0} 种节点类型，{schema?.relationships.length || 0} 种关系类型
-              </p>
-            </div>
-          </div>
-          <button onClick={onClose} className="text-neo-dim hover:text-white p-2">
-            <X className="w-5 h-5" />
-          </button>
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="数据库模式"
+      description={`${schema?.labels.length || 0} 种节点类型，${schema?.relationships.length || 0} 种关系类型`}
+      icon={<Database className="w-5 h-5 text-neo-primary" />}
+    >
+      {/* Search */}
+      <div className="p-4 border-b border-neo-border">
+        <div className="relative">
+          <Search className="absolute left-3 top-2.5 w-4 h-4 text-neo-dim" />
+          <input type="text" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="搜索标签、关系、属性..."
+            className="w-full bg-neo-bg border border-neo-border rounded-lg py-2 pl-10 pr-4 text-sm text-white placeholder-neo-dim focus:ring-1 focus:ring-neo-primary outline-none" />
         </div>
+      </div>
 
-        {/* Search */}
-        <div className="p-4 border-b border-neo-border">
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-neo-dim" />
-          <input
-                type="text"
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-                placeholder="搜索标签、关系、属性..."
-              className="w-full bg-neo-bg border border-neo-border rounded-lg py-2 pl-10 pr-4 text-sm text-white placeholder-neo-dim focus:ring-1 focus:ring-neo-primary outline-none"
-            />
+      <ErrorAlert message={error} />
+
+      <div className="p-4 md:p-6 space-y-6">
+        {/* Node Labels Section */}
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <Layers className="w-4 h-4 text-neo-primary" />
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider">节点标签</h3>
           </div>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
-          {error && (
-            <div className="p-4 text-red-400 text-sm bg-red-500/10 border-b border-neo-border">
-              {error}
+          {filteredLabels.length === 0 ? (
+            <p className="text-neo-dim text-sm">未找到节点标签。</p>
+          ) : (
+            <div className="space-y-2">
+              {filteredLabels.map(label => (
+                <div key={label.label} className="bg-neo-bg rounded-lg border border-neo-border overflow-hidden">
+                  <button onClick={() => toggleLabel(label.label)}
+                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-colors">
+                    <div className="flex items-center gap-3">
+                      {expandedLabels.has(label.label) ? <ChevronDown className="w-4 h-4 text-neo-dim" /> : <ChevronRight className="w-4 h-4 text-neo-dim" />}
+                      <span className="font-medium text-white">{label.label}</span>
+                      <span className="text-xs text-neo-dim bg-neo-panel px-2 py-0.5 rounded-full">{label.count.toLocaleString()} 个节点</span>
+                    </div>
+                    <button onClick={(e) => { e.stopPropagation(); copyToClipboard(`:${label.label}`, label.label); }}
+                      className="text-neo-dim hover:text-white p-1" title="复制标签">
+                      {copiedLabel === label.label ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </button>
+                  {expandedLabels.has(label.label) && (
+                    <div className="px-4 pb-4 border-t border-neo-border">
+                      <div className="mt-3">
+                        <span className="text-xs text-neo-dim uppercase font-mono">属性</span>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {label.properties.map(prop => (
+                            <span key={prop} className="text-xs bg-neo-panel text-neo-primary px-2 py-1 rounded">{prop}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <span className="text-xs text-neo-dim uppercase font-mono">快速查询</span>
+                        <button onClick={() => onSelectLabel?.(generateCypher(label))}
+                          className="mt-2 w-full text-left bg-black/40 rounded p-2 font-mono text-xs text-neo-dim hover:bg-black/60 transition-colors">
+                          {generateCypher(label)}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
+        </div>
 
-          <div className="p-4 md:p-6 space-y-6">
-            {/* Node Labels Section */}
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <Layers className="w-4 h-4 text-neo-primary" />
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider">节点标签</h3>
-              </div>
-
-              {filteredLabels.length === 0 ? (
-                <p className="text-neo-dim text-sm">未找到节点标签。</p>
-              ) : (
-                <div className="space-y-2">
-                  {filteredLabels.map(label => (
-                    <div key={label.label} className="bg-neo-bg rounded-lg border border-neo-border overflow-hidden">
-                      <button
-                        onClick={() => toggleLabel(label.label)}
-                        className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          {expandedLabels.has(label.label) ? (
-                            <ChevronDown className="w-4 h-4 text-neo-dim" />
-                          ) : (
-                            <ChevronRight className="w-4 h-4 text-neo-dim" />
-                          )}
-                          <span className="font-medium text-white">{label.label}</span>
-                           <span className="text-xs text-neo-dim bg-neo-panel px-2 py-0.5 rounded-full">
-                            {label.count.toLocaleString()} 个节点
-                          </span>
-                        </div>
-                         <button
-                           onClick={(e) => {
-                             e.stopPropagation();
-                             copyToClipboard(`:${label.label}`, label.label);
-                           }}
-                           className="text-neo-dim hover:text-white p-1"
-                           title="复制标签"
-                         >
-                          {copiedLabel === label.label ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                        </button>
-                      </button>
-
-                      {expandedLabels.has(label.label) && (
-                        <div className="px-4 pb-4 border-t border-neo-border">
-                           <div className="mt-3">
-                             <span className="text-xs text-neo-dim uppercase font-mono">属性</span>
-                            <div className="flex flex-wrap gap-2 mt-1">
-                              {label.properties.map(prop => (
-                                <span key={prop} className="text-xs bg-neo-panel text-neo-primary px-2 py-1 rounded">
-                                  {prop}
-                                </span>
-                              ))}
-                            </div>
-                           </div>
-                          <div className="mt-3">
-                             <span className="text-xs text-neo-dim uppercase font-mono">快速查询</span>
-                             <button
-                               onClick={() => onSelectLabel?.(generateCypher(label))}
-                               className="mt-2 w-full text-left bg-black/40 rounded p-2 font-mono text-xs text-neo-dim hover:bg-black/60 transition-colors"
-                             >
-                               {generateCypher(label)}
-                             </button>
-                           </div>
-                         </div>
-                           <div className="mt-3 flex gap-4">
-                             <div>
-                               <span className="text-xs text-neo-dim uppercase font-mono">起始节点</span>
-                              <div className="flex gap-1 mt-1">
-                                {rel.fromLabels.map(l => (
-                                  <span key={l} className="text-xs bg-neo-primary/20 text-neo-primary px-2 py-1 rounded">
-                                    {l}
-                                  </span>
-                                ))}
-                              </div>
-                             </div>
-                             <div>
-                               <span className="text-xs text-neo-dim uppercase font-mono">终止节点</span>
-                              <div className="flex gap-1 mt-1">
-                                {rel.toLabels.map(l => (
-                                  <span key={l} className="text-xs bg-neo-secondary/20 text-neo-secondary px-2 py-1 rounded">
-                                    {l}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
+        {/* Relationship Types Section */}
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <GitBranch className="w-4 h-4 text-neo-secondary" />
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider">关系类型</h3>
+          </div>
+          {filteredRels.length === 0 ? (
+            <p className="text-neo-dim text-sm">未找到关系类型。</p>
+          ) : (
+            <div className="space-y-2">
+              {filteredRels.map(rel => (
+                <div key={rel.type} className="bg-neo-bg rounded-lg border border-neo-border overflow-hidden">
+                  <button onClick={() => toggleRel(rel.type)}
+                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-colors">
+                    <div className="flex items-center gap-3">
+                      {expandedRels.has(rel.type) ? <ChevronDown className="w-4 h-4 text-neo-dim" /> : <ChevronRight className="w-4 h-4 text-neo-dim" />}
+                      <span className="font-medium text-white">{rel.type}</span>
+                      <span className="text-xs text-neo-dim bg-neo-panel px-2 py-0.5 rounded-full">{rel.count.toLocaleString()} 条关系</span>
+                    </div>
+                    <button onClick={(e) => { e.stopPropagation(); copyToClipboard(`:${rel.type}`, rel.type); }}
+                      className="text-neo-dim hover:text-white p-1" title="复制关系类型">
+                      {copiedLabel === rel.type ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </button>
+                  {expandedRels.has(rel.type) && (
+                    <div className="px-4 pb-4 border-t border-neo-border">
+                      <div className="mt-3 flex gap-4">
+                        <div>
+                          <span className="text-xs text-neo-dim uppercase font-mono">起始节点</span>
+                          <div className="flex gap-1 mt-1">
+                            {rel.fromLabels.map(l => (
+                              <span key={l} className="text-xs bg-neo-primary/20 text-neo-primary px-2 py-1 rounded">{l}</span>
+                            ))}
                           </div>
-                           {rel.properties.length > 0 && (
-                             <div className="mt-3">
-                               <span className="text-xs text-neo-dim uppercase font-mono">属性</span>
-                              <div className="flex flex-wrap gap-2 mt-1">
-                                {rel.properties.map(prop => (
-                                  <span key={prop} className="text-xs bg-neo-panel text-neo-dim px-2 py-1 rounded">
-                                    {prop}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                           )}
-                          <div className="mt-3">
-                             <span className="text-xs text-neo-dim uppercase font-mono">快速查询</span>
-                             <button
-                               onClick={() => onSelectRelationship?.(generateRelCypher(rel))}
-                              className="mt-2 w-full text-left bg-black/40 rounded p-2 font-mono text-xs text-neo-dim hover:bg-black/60 transition-colors"
-                            >
-                              {generateRelCypher(rel)}
-                            </button>
+                        </div>
+                        <div>
+                          <span className="text-xs text-neo-dim uppercase font-mono">终止节点</span>
+                          <div className="flex gap-1 mt-1">
+                            {rel.toLabels.map(l => (
+                              <span key={l} className="text-xs bg-neo-secondary/20 text-neo-secondary px-2 py-1 rounded">{l}</span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      {rel.properties.length > 0 && (
+                        <div className="mt-3">
+                          <span className="text-xs text-neo-dim uppercase font-mono">属性</span>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {rel.properties.map(prop => (
+                              <span key={prop} className="text-xs bg-neo-panel text-neo-dim px-2 py-1 rounded">{prop}</span>
+                            ))}
                           </div>
                         </div>
                       )}
+                      <div className="mt-3">
+                        <span className="text-xs text-neo-dim uppercase font-mono">快速查询</span>
+                        <button onClick={() => onSelectRelationship?.(generateRelCypher(rel))}
+                          className="mt-2 w-full text-left bg-black/40 rounded p-2 font-mono text-xs text-neo-dim hover:bg-black/60 transition-colors">
+                          {generateRelCypher(rel)}
+                        </button>
+                      </div>
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
+              ))}
             </div>
-          </div>
+          )}
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };
 

@@ -4,7 +4,8 @@
  */
 
 import { DIContainer, globalContainer } from './di/DIContainer';
-import { PluginManager, globalEventBus, EVENT_TYPES } from './events/EventBus';
+import { globalEventBus, EVENT_TYPES } from './events/EventBus';
+import { PluginManager } from './plugins/PluginManager';
 import { registerServices, SERVICE_IDS } from './services/ServiceRegistry';
 import type { PerformanceConfig, ConnectionConfig } from '../types';
 
