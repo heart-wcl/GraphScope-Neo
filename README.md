@@ -4,6 +4,7 @@
   <img src="https://img.shields.io/badge/React-19.2.4-61DAFB?style=flat-square&logo=react" alt="React" />
   <img src="https://img.shields.io/badge/TypeScript-5.8.2-3178C6?style=flat-square&logo=typescript" alt="TypeScript" />
   <img src="https://img.shields.io/badge/Vite-6.2.0-646CFF?style=flat-square&logo=vite" alt="Vite" />
+  <img src="https://img.shields.io/badge/Tauri-2.10-24C8D8?style=flat-square&logo=tauri" alt="Tauri" />
   <img src="https://img.shields.io/badge/D3.js-7.9.0-F9A03C?style=flat-square&logo=d3.js" alt="D3.js" />
   <img src="https://img.shields.io/badge/Neo4j-5.20.0-008CC1?style=flat-square&logo=neo4j" alt="Neo4j" />
 </p>
@@ -99,9 +100,16 @@
 
 ### 环境要求
 
+**Web 开发模式：**
 - Node.js 18+
-- npm 或 yarn 或 pnpm
+- pnpm (推荐) / npm / yarn
 - Neo4j 数据库 4.x / 5.x（可选，支持演示模式）
+
+**桌面客户端打包（额外要求）：**
+- [Rust](https://www.rust-lang.org/tools/install) (通过 rustup 安装)
+- [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (Windows)
+- [Windows SDK](https://developer.microsoft.com/windows/downloads/windows-sdk/) (Windows，包含 kernel32.lib 等系统库)
+- WebView2 Runtime (Windows 10/11 通常已预装)
 
 ### 安装
 
@@ -111,18 +119,69 @@ git clone https://github.com/YOUR_USERNAME/graphscope-neo.git
 cd graphscope-neo
 
 # 安装依赖
-npm install
+pnpm install
 
-# 启动开发服务器
-npm run dev
+# 启动 Web 开发服务器
+pnpm dev
 ```
 
-### 构建生产版本
+### 构建 Web 版本
 
 ```bash
-npm run build
-npm run preview
+pnpm build
+pnpm preview
 ```
+
+### 🖥️ 桌面客户端（Tauri 2.0）
+
+本项目已集成 [Tauri 2.0](https://tauri.app/)，可以打包为轻量级桌面应用。
+
+#### 开发模式
+
+桌面客户端开发模式支持热重载，前端代码修改后会实时更新：
+
+```bash
+# 方式一：直接运行（需要 MSVC 工具链在 PATH 中）
+pnpm tauri:dev
+
+# 方式二：通过 VS 环境脚本运行（推荐 Windows 用户，自动设置编译环境）
+pnpm tauri:dev-win
+```
+
+#### 构建安装包
+
+```bash
+# 方式一：直接构建
+pnpm tauri:build
+
+# 方式二：通过 VS 环境脚本构建（推荐 Windows 用户）
+pnpm tauri:build-win
+```
+
+构建产物位于 `src-tauri/target/release/bundle/`：
+
+| 文件 | 说明 | 参考体积 |
+|------|------|----------|
+| `GraphScope Neo_x.x.x_x64-setup.exe` | NSIS 安装包 | ~2 MB |
+| `GraphScope Neo_x.x.x_x64_en-US.msi` | MSI 安装包 | ~3 MB |
+| `graphscope-neo.exe` | 可执行文件 | ~8 MB |
+
+#### 自定义应用图标
+
+```bash
+# 准备一张 1024x1024 以上的 PNG 源图，自动生成所有尺寸
+pnpm tauri icon <path-to-icon.png>
+```
+
+生成的图标文件会保存在 `src-tauri/icons/` 目录下。
+
+#### Windows 构建注意事项
+
+如果你的系统 PATH 中存在 Cygwin/MSYS2 的 `link.exe`，直接运行 `pnpm tauri:build` 可能会遇到链接器冲突。解决方案：
+
+1. **推荐**：使用 `pnpm tauri:build-win`，它会自动通过 `vcvars64.bat` 设置正确的 VS 编译环境
+2. 或在 **Visual Studio Developer Command Prompt** 中运行 `pnpm tauri:build`
+3. 或调整系统 PATH，确保 MSVC 的 `link.exe` 优先级高于 Cygwin
 
 ---
 
@@ -172,6 +231,18 @@ graphscope-neo/
 │       ├── lodRenderer.ts     # LOD 渲染器
 │       └── viewportCulling.ts # 视口裁剪
 │
+├── src-tauri/                  # Tauri 桌面客户端 (Rust)
+│   ├── tauri.conf.json        # Tauri 配置（窗口、打包、图标等）
+│   ├── Cargo.toml             # Rust 依赖
+│   ├── capabilities/          # Tauri 权限配置
+│   ├── icons/                 # 应用图标（多种尺寸）
+│   └── src/
+│       ├── main.rs            # Rust 入口
+│       └── lib.rs             # 应用逻辑
+│
+├── scripts/                    # 构建辅助脚本
+│   └── tauri-build.bat        # Windows VS 环境构建脚本
+│
 ├── types/                      # TypeScript 类型定义
 ├── e2e/                        # E2E 测试
 └── docs/                       # 文档
@@ -186,10 +257,11 @@ graphscope-neo/
 | 前端框架 | React | 19.2.4 |
 | 类型系统 | TypeScript | 5.8.2 |
 | 构建工具 | Vite | 6.2.0 |
+| 桌面客户端 | Tauri | 2.10 |
 | 图形渲染 | D3.js | 7.9.0 |
 | Neo4j 驱动 | neo4j-driver | 5.20.0 |
 | 图标库 | lucide-react | 0.563.0 |
-| 样式 | Tailwind CSS | CDN |
+| 样式 | Tailwind CSS | 4.1 |
 | 单元测试 | Jest | 30.2.0 |
 | E2E 测试 | Playwright | 1.58.0 |
 
@@ -234,19 +306,35 @@ RETURN gds.util.asNode(nodeId).name AS name, score
 ORDER BY score DESC
 ```
 
+### 📋 命令速查表
+
+| 命令 | 说明 |
+|------|------|
+| `pnpm dev` | 启动 Web 开发服务器 (localhost:3000) |
+| `pnpm build` | 构建 Web 生产版本 |
+| `pnpm preview` | 预览 Web 生产构建 |
+| `pnpm tauri:dev` | 启动桌面客户端开发模式（热重载） |
+| `pnpm tauri:build` | 构建桌面客户端安装包 |
+| `pnpm tauri:dev-win` | 通过 VS 环境启动桌面客户端开发模式 (Windows) |
+| `pnpm tauri:build-win` | 通过 VS 环境构建桌面客户端 (Windows) |
+| `pnpm tauri icon <img>` | 从源图生成所有尺寸的应用图标 |
+| `pnpm test` | 运行单元测试 |
+| `pnpm test:watch` | 监听模式运行测试 |
+| `pnpm test:coverage` | 生成测试覆盖率报告 |
+
 ---
 
 ## 🧪 测试 Testing
 
 ```bash
 # 运行单元测试
-npm run test
+pnpm test
 
 # 监听模式
-npm run test:watch
+pnpm test:watch
 
 # 生成覆盖率报告
-npm run test:coverage
+pnpm test:coverage
 ```
 
 ---
@@ -287,6 +375,7 @@ npm run test:coverage
 - [D3.js](https://d3js.org/) - 数据可视化库
 - [React](https://react.dev/) - 用户界面库
 - [Vite](https://vitejs.dev/) - 下一代前端构建工具
+- [Tauri](https://tauri.app/) - 轻量级跨平台桌面应用框架
 - [Tailwind CSS](https://tailwindcss.com/) - 实用优先的 CSS 框架
 - [Lucide](https://lucide.dev/) - 精美的图标库
 

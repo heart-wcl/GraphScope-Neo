@@ -1,99 +1,14 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-   <head>
-     <meta charset="utf-8" />
-     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-     <title>Neo4j 图数据可视化</title>
-     <script src="https://cdn.tailwindcss.com"></script>
-     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-     <script>
-       tailwind.config = {
-         theme: {
-           extend: {
-             fontFamily: {
-               sans: ['Inter', 'sans-serif'],
-               mono: ['JetBrains Mono', 'monospace'],
-             },
-             colors: {
-               neo: {
-                 bg: 'var(--neo-bg)',
-                 panel: 'var(--neo-panel)',
-                 border: 'var(--neo-border)',
-                 primary: 'var(--neo-primary)',
-                 secondary: 'var(--neo-secondary)',
-                 accent: 'var(--neo-accent)',
-                 text: 'var(--neo-text)',
-                 dim: 'var(--neo-dim)'
-               }
-             },
-             animation: {
-               'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-               'float': 'float 6s ease-in-out infinite',
-             },
-             keyframes: {
-               float: {
-                 '0%, 100%': { transform: 'translateY(0)' },
-                 '50%': { transform: 'translateY(-10px)' },
-               }
-             }
-           }
-         }
-       }
-     </script>
-     <style>
-       body {
-         background-color: var(--neo-bg);
-         color: var(--neo-text);
-         overflow: hidden;
-         transition: background-color 0.3s ease, color 0.3s ease;
-       }
-       /* Custom Scrollbar */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #151921; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #2A303C; 
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #3746A3; 
-      }
-      
-      .glass-panel {
-        background: rgba(21, 25, 33, 0.7);
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-      }
-      
-      .neon-glow {
-        box-shadow: 0 0 10px rgba(0, 242, 255, 0.2), 0 0 20px rgba(0, 242, 255, 0.1);
-      }
-
-      .node-label {
-        text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-        pointer-events: none;
-      }
-    </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "react": "https://esm.sh/react@^19.2.4",
-    "d3": "https://esm.sh/d3@^7.9.0",
-    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
-    "neo4j-driver": "https://esm.sh/neo4j-driver-lite@5.20.0?bundle"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
-</head>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GraphScope Neo - Neo4j 图数据可视化</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/index.css">
+  </head>
   <body>
     <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
-</body>
+    <script type="module" src="/index.tsx"></script>
+  </body>
 </html>
