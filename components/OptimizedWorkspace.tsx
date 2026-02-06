@@ -34,7 +34,7 @@ import FulltextSearch from './FulltextSearch';
 import PathFinder from './PathFinder';
 import DatabaseManager from './DatabaseManager';
 import AlgorithmRunner from './AlgorithmRunner';
-import QueryHistory from './QueryHistory';
+import QueryHistory, { addQueryToHistory } from './QueryHistory';
 
 interface OptimizedWorkspaceProps {
   config: ConnectionConfig;
@@ -165,6 +165,7 @@ const OptimizedWorkspace: React.FC<OptimizedWorkspaceProps> = ({
 
     setIsLoading(true);
     setError(null);
+    const startTime = performance.now();
 
     try {
       let result: any;
@@ -195,6 +196,10 @@ const OptimizedWorkspace: React.FC<OptimizedWorkspaceProps> = ({
         // 小图或无 loaderManager，直接执行
         result = await executeCypher(driver, query, config.database || undefined, isDemoMode);
       }
+
+      // 记录查询历史
+      const executionTime = Math.round(performance.now() - startTime);
+      addQueryToHistory(query, executionTime, config.database || undefined);
 
       const isExecutionPlan = result && typeof result === 'object' && 'root' in result;
       const isTabularResult = result && 'columns' in result;
@@ -825,7 +830,7 @@ const OptimizedWorkspace: React.FC<OptimizedWorkspaceProps> = ({
             setQuery(selectedQuery);
             setShowQueryHistory(false);
           }}
-          currentQuery={query}
+          currentDatabase={config.database}
         />
       )}
     </div>
