@@ -83,6 +83,14 @@
     <td align="center"><b>Cypher 查询</b></td>
     <td align="center"><b>Schema 浏览</b></td>
   </tr>
+  <tr>
+    <td><img src="./query-history-with-record.png" alt="Query History with Record" /></td>
+    <td><img src="./query-history-favorited.png" alt="Query History Favorited" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>查询历史（记录）</b></td>
+    <td align="center"><b>查询历史（收藏）</b></td>
+  </tr>
 </table>
 
 ---
