@@ -135,7 +135,7 @@ const QueryHistory: React.FC<QueryHistoryProps> = ({
   const regularHistory = filteredHistory.filter(item => !item.isFavorite);
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-80 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4" style={{ zIndex: 100 }}>
       <div className="glass-panel rounded-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden animate-fade-in">
         {/* Header */}
         <div className="p-4 md:p-6 border-b border-neo-border flex items-center justify-between">

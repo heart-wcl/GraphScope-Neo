@@ -13,7 +13,7 @@ export interface DatabaseInfo {
   role: string;
   requestedStatus: string;
   currentStatus: string;
-  error: string;
+  statusMessage: string;
   default: boolean;
   home: boolean;
 }
@@ -28,6 +28,21 @@ export interface DatabaseStatistics {
 }
 
 /**
+ * 安全获取记录字段值
+ */
+function safeGet(record: any, key: string, defaultValue: any = ''): any {
+  try {
+    const keys = record.keys || [];
+    if (keys.includes(key)) {
+      return record.get(key) ?? defaultValue;
+    }
+    return defaultValue;
+  } catch {
+    return defaultValue;
+  }
+}
+
+/**
  * 列出所有数据库
  */
 export async function listDatabases(driver: Driver): Promise<DatabaseInfo[]> {
@@ -37,16 +52,16 @@ export async function listDatabases(driver: Driver): Promise<DatabaseInfo[]> {
     const result = await session.run('SHOW DATABASES');
     
     return result.records.map(record => ({
-      name: record.get('name'),
-      type: record.get('type') || 'standard',
-      access: record.get('access') || 'read-write',
-      address: record.get('address') || 'localhost',
-      role: record.get('role') || 'standalone',
-      requestedStatus: record.get('requestedStatus') || 'online',
-      currentStatus: record.get('currentStatus') || 'online',
-      error: record.get('error') || '',
-      default: record.get('default') || false,
-      home: record.get('home') || false
+      name: safeGet(record, 'name', 'unknown'),
+      type: safeGet(record, 'type', 'standard'),
+      access: safeGet(record, 'access', 'read-write'),
+      address: safeGet(record, 'address', 'localhost'),
+      role: safeGet(record, 'role', 'standalone'),
+      requestedStatus: safeGet(record, 'requestedStatus', 'online'),
+      currentStatus: safeGet(record, 'currentStatus', 'online'),
+      statusMessage: safeGet(record, 'statusMessage', ''),
+      default: safeGet(record, 'default', false),
+      home: safeGet(record, 'home', false)
     }));
   } finally {
     await session.close();

@@ -32,6 +32,21 @@ export interface RelationshipSearchResult {
 }
 
 /**
+ * 安全获取记录字段值
+ */
+function safeGetField(record: any, key: string, defaultValue: any = null): any {
+  try {
+    const keys = record.keys || [];
+    if (keys.includes(key)) {
+      return record.get(key) ?? defaultValue;
+    }
+    return defaultValue;
+  } catch {
+    return defaultValue;
+  }
+}
+
+/**
  * 获取所有全文索引
  */
 export async function getFulltextIndexes(
@@ -41,22 +56,46 @@ export async function getFulltextIndexes(
   const session = driver.session(database ? { database } : undefined);
   
   try {
-    const result = await session.run(`
-      SHOW INDEXES
-      WHERE type = 'FULLTEXT'
-      YIELD name, type, entityType, labelsOrTypes, properties, state, populationPercent
-      RETURN name, type, entityType, labelsOrTypes, properties, state, populationPercent
-    `);
-    
-    return result.records.map(record => ({
-      name: record.get('name'),
-      type: 'FULLTEXT' as const,
-      entityType: record.get('entityType'),
-      labelsOrTypes: record.get('labelsOrTypes') || [],
-      properties: record.get('properties') || [],
-      state: record.get('state'),
-      populationPercent: record.get('populationPercent') || 100
-    }));
+    // 尝试使用 Neo4j 4.x+ 语法
+    try {
+      const result = await session.run(`
+        SHOW FULLTEXT INDEXES
+        YIELD name, type, entityType, labelsOrTypes, properties, state, populationPercent
+      `);
+      
+      return result.records.map(record => ({
+        name: safeGetField(record, 'name', 'unknown'),
+        type: 'FULLTEXT' as const,
+        entityType: safeGetField(record, 'entityType', 'NODE'),
+        labelsOrTypes: safeGetField(record, 'labelsOrTypes', []) || [],
+        properties: safeGetField(record, 'properties', []) || [],
+        state: safeGetField(record, 'state', 'ONLINE'),
+        populationPercent: safeGetField(record, 'populationPercent', 100) || 100
+      }));
+    } catch (e) {
+      // 尝试使用旧版语法 (db.indexes)
+      console.log('[FulltextSearch] SHOW FULLTEXT INDEXES failed, trying db.indexes()...');
+      const result = await session.run(`
+        CALL db.indexes()
+        YIELD name, type, labelsOrTypes, properties, state
+        WHERE type = 'FULLTEXT'
+        RETURN name, type, labelsOrTypes, properties, state
+      `);
+      
+      return result.records.map(record => ({
+        name: safeGetField(record, 'name', 'unknown'),
+        type: 'FULLTEXT' as const,
+        entityType: 'NODE' as const, // 旧版 API 不返回 entityType
+        labelsOrTypes: safeGetField(record, 'labelsOrTypes', []) || [],
+        properties: safeGetField(record, 'properties', []) || [],
+        state: safeGetField(record, 'state', 'ONLINE'),
+        populationPercent: 100
+      }));
+    }
+  } catch (error) {
+    console.error('[FulltextSearch] Failed to get fulltext indexes:', error);
+    // 如果所有方法都失败，返回空数组而不是报错
+    return [];
   } finally {
     await session.close();
   }
@@ -144,6 +183,8 @@ export async function fulltextSearchNodes(
   database?: string
 ): Promise<SearchResult[]> {
   const session = driver.session(database ? { database } : undefined);
+  // 确保 limit 是整数，直接嵌入查询字符串避免驱动类型转换问题
+  const intLimit = Math.floor(limit);
   
   try {
     const result = await session.run(`
@@ -151,8 +192,8 @@ export async function fulltextSearchNodes(
       YIELD node, score
       RETURN node, score
       ORDER BY score DESC
-      LIMIT $limit
-    `, { indexName, searchTerm, limit });
+      LIMIT ${intLimit}
+    `, { indexName, searchTerm });
     
     return result.records.map(record => {
       const node = record.get('node');
@@ -181,6 +222,8 @@ export async function fulltextSearchRelationships(
   database?: string
 ): Promise<RelationshipSearchResult[]> {
   const session = driver.session(database ? { database } : undefined);
+  // 确保 limit 是整数，直接嵌入查询字符串避免驱动类型转换问题
+  const intLimit = Math.floor(limit);
   
   try {
     const result = await session.run(`
@@ -188,8 +231,8 @@ export async function fulltextSearchRelationships(
       YIELD relationship, score
       RETURN relationship, score
       ORDER BY score DESC
-      LIMIT $limit
-    `, { indexName, searchTerm, limit });
+      LIMIT ${intLimit}
+    `, { indexName, searchTerm });
     
     return result.records.map(record => {
       const rel = record.get('relationship');

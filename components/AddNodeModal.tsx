@@ -52,7 +52,7 @@ const AddNodeModal: React.FC<AddNodeModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-80">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100]" style={{ zIndex: 100 }}>
       <div className="bg-neo-panel border border-neo-border rounded-xl w-full max-w-md mx-4 shadow-2xl animate-scale-in">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-neo-border">

@@ -284,7 +284,7 @@ const ImportExport: React.FC<ImportExportProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] p-4">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] p-4" style={{ zIndex: 100 }}>
       <div className="glass-panel rounded-2xl w-full max-w-2xl max-h-[70vh] flex flex-col overflow-hidden animate-fade-in">
         {/* Header */}
         <div className="p-4 md:p-6 border-b border-neo-border flex items-center justify-between">

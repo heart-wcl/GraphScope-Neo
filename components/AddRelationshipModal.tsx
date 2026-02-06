@@ -75,7 +75,7 @@ const AddRelationshipModal: React.FC<AddRelationshipModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-80">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100]" style={{ zIndex: 100 }}>
       <div className="bg-neo-panel border border-neo-border rounded-xl w-full max-w-lg mx-4 shadow-2xl animate-scale-in max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-neo-border shrink-0">
           <div className="flex items-center gap-2">

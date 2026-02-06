@@ -39,6 +39,7 @@ const FulltextSearch: React.FC<FulltextSearchProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [searchMode, setSearchMode] = useState<'normal' | 'fuzzy'>('normal');
   const [fuzziness, setFuzziness] = useState(2);
   
@@ -85,7 +86,23 @@ const FulltextSearch: React.FC<FulltextSearchProps> = ({
   };
 
   const handleSearch = async () => {
-    if (!driver || !selectedIndex || !searchTerm.trim()) return;
+    console.log('[FulltextSearch] handleSearch called', { driver: !!driver, selectedIndex, searchTerm });
+    
+    if (!driver) {
+      console.log('[FulltextSearch] No driver');
+      setError('没有数据库连接');
+      return;
+    }
+    if (!selectedIndex) {
+      console.log('[FulltextSearch] No index selected');
+      setError('请先选择一个索引');
+      return;
+    }
+    if (!searchTerm.trim()) {
+      console.log('[FulltextSearch] No search term');
+      setError('请输入搜索词');
+      return;
+    }
 
     setSearching(true);
     setError(null);
@@ -93,14 +110,19 @@ const FulltextSearch: React.FC<FulltextSearchProps> = ({
     try {
       let results: SearchResult[];
       
+      console.log('[FulltextSearch] Searching with', { mode: searchMode, index: selectedIndex, term: searchTerm });
+      
       if (searchMode === 'fuzzy') {
         results = await fuzzySearchNodes(driver, selectedIndex, searchTerm, fuzziness, 50, database);
       } else {
         results = await fulltextSearchNodes(driver, selectedIndex, searchTerm, 50, database);
       }
       
+      console.log('[FulltextSearch] Search results:', results.length);
       setSearchResults(results);
+      setHasSearched(true);
     } catch (err) {
+      console.error('[FulltextSearch] Search error:', err);
       setError(`搜索失败: ${err instanceof Error ? err.message : '未知错误'}`);
     } finally {
       setSearching(false);
@@ -174,7 +196,7 @@ const FulltextSearch: React.FC<FulltextSearchProps> = ({
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-80">
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" style={{ zIndex: 100 }}>
         <div className="glass-panel rounded-2xl p-8 flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-neo-primary border-t-transparent rounded-full animate-spin"></div>
           <span className="text-white font-medium">加载中...</span>
@@ -184,7 +206,7 @@ const FulltextSearch: React.FC<FulltextSearchProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-80 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4" style={{ zIndex: 100 }}>
       <div className="glass-panel rounded-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden animate-fade-in">
         {/* Header */}
         <div className="p-4 md:p-6 border-b border-neo-border flex items-center justify-between">
@@ -439,10 +461,16 @@ const FulltextSearch: React.FC<FulltextSearchProps> = ({
                   <Search className="w-12 h-12 text-neo-dim mx-auto mb-4" />
                   <p className="text-neo-dim">请先选择一个索引</p>
                 </div>
-              ) : searchResults.length === 0 ? (
+              ) : !hasSearched ? (
                 <div className="text-center py-12">
                   <Search className="w-12 h-12 text-neo-dim mx-auto mb-4" />
                   <p className="text-neo-dim">输入搜索词开始搜索</p>
+                </div>
+              ) : searchResults.length === 0 ? (
+                <div className="text-center py-12">
+                  <Search className="w-12 h-12 text-neo-dim mx-auto mb-4" />
+                  <p className="text-neo-dim">未找到匹配结果</p>
+                  <p className="text-neo-dim text-sm mt-2">尝试使用不同的搜索词或模糊搜索</p>
                 </div>
               ) : (
                 <div className="space-y-3">

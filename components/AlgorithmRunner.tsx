@@ -104,6 +104,11 @@ const AlgorithmRunner: React.FC<AlgorithmRunnerProps> = ({
   const [selectedRelTypes, setSelectedRelTypes] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
 
+  // 基础模式算法（不需要 GDS）
+  const [basicMode, setBasicMode] = useState(false);
+  const [basicResults, setBasicResults] = useState<any[]>([]);
+  const [basicAlgorithm, setBasicAlgorithm] = useState<'degree' | 'distribution' | 'paths' | 'hubs'>('degree');
+
   useEffect(() => {
     checkGDS();
   }, [driver]);
@@ -253,7 +258,7 @@ const AlgorithmRunner: React.FC<AlgorithmRunnerProps> = ({
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-80">
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" style={{ zIndex: 100 }}>
         <div className="glass-panel rounded-2xl p-8 flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-neo-primary border-t-transparent rounded-full animate-spin"></div>
           <span className="text-white font-medium">检查 GDS 可用性...</span>
@@ -262,29 +267,278 @@ const AlgorithmRunner: React.FC<AlgorithmRunnerProps> = ({
     );
   }
 
-  if (gdsAvailable === false) {
+  const runBasicAlgorithm = async () => {
+    if (!driver) return;
+
+    setRunning(true);
+    setError(null);
+    setBasicResults([]);
+
+    try {
+      const session = driver.session({ database });
+      let query = '';
+      
+      switch (basicAlgorithm) {
+        case 'degree':
+          // 计算每个节点的度（出度+入度）
+          query = `
+            MATCH (n)
+            OPTIONAL MATCH (n)-[r]-()
+            WITH n, count(r) as degree, labels(n) as labels
+            RETURN id(n) as nodeId, labels, n.name as name, degree
+            ORDER BY degree DESC
+            LIMIT 100
+          `;
+          break;
+        case 'distribution':
+          // 节点标签分布统计
+          query = `
+            MATCH (n)
+            WITH labels(n) as labels, count(*) as count
+            RETURN labels, count
+            ORDER BY count DESC
+          `;
+          break;
+        case 'paths':
+          // 路径长度统计
+          query = `
+            MATCH p = (a)-[*1..3]-(b)
+            WHERE id(a) < id(b)
+            WITH length(p) as pathLength, count(*) as pathCount
+            RETURN pathLength, pathCount
+            ORDER BY pathLength
+            LIMIT 10
+          `;
+          break;
+        case 'hubs':
+          // 找出高连接度的枢纽节点
+          query = `
+            MATCH (n)
+            OPTIONAL MATCH (n)-[r]->()
+            WITH n, count(r) as outDegree, labels(n) as labels
+            OPTIONAL MATCH (n)<-[r2]-()
+            WITH n, outDegree, count(r2) as inDegree, labels
+            WITH n, outDegree, inDegree, outDegree + inDegree as totalDegree, labels
+            WHERE totalDegree > 2
+            RETURN id(n) as nodeId, labels, n.name as name, outDegree, inDegree, totalDegree
+            ORDER BY totalDegree DESC
+            LIMIT 50
+          `;
+          break;
+      }
+
+      const result = await session.run(query);
+      const data = result.records.map(r => r.toObject());
+      setBasicResults(data);
+      await session.close();
+    } catch (err) {
+      setError(`算法执行失败: ${err instanceof Error ? err.message : '未知错误'}`);
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  // 如果 GDS 不可用，显示基础模式
+  if (gdsAvailable === false || basicMode) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-80 p-4">
-        <div className="glass-panel rounded-2xl w-full max-w-md p-8 text-center">
-          <AlertCircle className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-white mb-2">GDS 未安装</h2>
-          <p className="text-neo-dim mb-6">
-            图算法功能需要 Neo4j Graph Data Science (GDS) 库。
-            请先安装 GDS 插件。
-          </p>
-          <button
-            onClick={onClose}
-            className="px-6 py-2 bg-neo-primary text-black font-medium rounded-lg"
-          >
-            关闭
-          </button>
+      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] p-4">
+        <div className="glass-panel rounded-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden animate-fade-in">
+          {/* Header */}
+          <div className="p-4 border-b border-neo-border flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
+                <Cpu className="w-5 h-5 text-purple-400" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white">图分析 (基础模式)</h2>
+                <p className="text-xs text-neo-dim">使用 Cypher 查询进行基础图分析</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {gdsAvailable && (
+                <button
+                  onClick={() => setBasicMode(false)}
+                  className="text-xs text-neo-primary hover:underline"
+                >
+                  切换到 GDS 模式
+                </button>
+              )}
+              <button onClick={onClose} className="text-neo-dim hover:text-white p-2">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* 提示信息 */}
+          {!gdsAvailable && (
+            <div className="px-4 py-3 bg-yellow-500/10 border-b border-neo-border flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-yellow-400 shrink-0" />
+              <span className="text-xs text-yellow-400">
+                GDS 未安装。当前为基础模式，提供简单的图分析功能。安装 GDS 可解锁更多高级算法。
+              </span>
+            </div>
+          )}
+
+          {/* Error */}
+          {error && (
+            <div className="px-4 py-3 bg-red-500/10 border-b border-neo-border flex items-center gap-2 text-red-400">
+              <AlertCircle className="w-4 h-4" />
+              <span className="text-sm">{error}</span>
+            </div>
+          )}
+
+          {/* Content */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* 算法选择 */}
+            <div className="w-56 border-r border-neo-border p-4 space-y-2">
+              <h3 className="text-xs font-bold text-neo-dim uppercase mb-3">基础算法</h3>
+              
+              <button
+                onClick={() => setBasicAlgorithm('degree')}
+                className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                  basicAlgorithm === 'degree'
+                    ? 'bg-purple-500/20 border border-purple-400'
+                    : 'bg-neo-bg border border-neo-border hover:border-purple-400/50'
+                }`}
+              >
+                <div className="text-sm text-white font-medium">度中心性</div>
+                <p className="text-xs text-neo-dim">计算节点连接数</p>
+              </button>
+
+              <button
+                onClick={() => setBasicAlgorithm('hubs')}
+                className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                  basicAlgorithm === 'hubs'
+                    ? 'bg-purple-500/20 border border-purple-400'
+                    : 'bg-neo-bg border border-neo-border hover:border-purple-400/50'
+                }`}
+              >
+                <div className="text-sm text-white font-medium">枢纽节点</div>
+                <p className="text-xs text-neo-dim">找出高连接度节点</p>
+              </button>
+
+              <button
+                onClick={() => setBasicAlgorithm('distribution')}
+                className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                  basicAlgorithm === 'distribution'
+                    ? 'bg-purple-500/20 border border-purple-400'
+                    : 'bg-neo-bg border border-neo-border hover:border-purple-400/50'
+                }`}
+              >
+                <div className="text-sm text-white font-medium">标签分布</div>
+                <p className="text-xs text-neo-dim">节点类型统计</p>
+              </button>
+
+              <button
+                onClick={() => setBasicAlgorithm('paths')}
+                className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                  basicAlgorithm === 'paths'
+                    ? 'bg-purple-500/20 border border-purple-400'
+                    : 'bg-neo-bg border border-neo-border hover:border-purple-400/50'
+                }`}
+              >
+                <div className="text-sm text-white font-medium">路径统计</div>
+                <p className="text-xs text-neo-dim">路径长度分布</p>
+              </button>
+            </div>
+
+            {/* 结果区 */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="p-4 border-b border-neo-border">
+                <button
+                  onClick={runBasicAlgorithm}
+                  disabled={running}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-purple-500 hover:bg-purple-400 text-white font-bold rounded-xl transition-colors disabled:opacity-50"
+                >
+                  {running ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      运行中...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-5 h-5" />
+                      运行分析
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
+                {basicResults.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Cpu className="w-12 h-12 text-neo-dim mx-auto mb-4" />
+                    <p className="text-neo-dim">选择算法并点击运行</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="text-sm text-neo-dim mb-4">
+                      {basicResults.length} 个结果
+                    </div>
+                    {basicResults.map((result, idx) => (
+                      <div
+                        key={idx}
+                        className="bg-neo-bg rounded-lg border border-neo-border p-3"
+                      >
+                        {basicAlgorithm === 'degree' || basicAlgorithm === 'hubs' ? (
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="text-white font-medium">
+                                {result.labels?.join(', ')}
+                              </span>
+                              {result.name && (
+                                <span className="text-neo-primary text-sm ml-2">
+                                  {result.name}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-right text-sm">
+                              {basicAlgorithm === 'hubs' ? (
+                                <div className="flex gap-3">
+                                  <span className="text-green-400">出:{result.outDegree?.low ?? result.outDegree}</span>
+                                  <span className="text-blue-400">入:{result.inDegree?.low ?? result.inDegree}</span>
+                                  <span className="text-purple-400 font-medium">总:{result.totalDegree?.low ?? result.totalDegree}</span>
+                                </div>
+                              ) : (
+                                <span className="text-purple-400 font-medium">
+                                  度: {result.degree?.low ?? result.degree}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ) : basicAlgorithm === 'distribution' ? (
+                          <div className="flex items-center justify-between">
+                            <span className="text-white font-medium">
+                              {result.labels?.join(', ') || '(无标签)'}
+                            </span>
+                            <span className="text-purple-400 font-medium">
+                              {result.count?.low ?? result.count} 个节点
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <span className="text-white font-medium">
+                              路径长度 {result.pathLength?.low ?? result.pathLength}
+                            </span>
+                            <span className="text-purple-400 font-medium">
+                              {result.pathCount?.low ?? result.pathCount} 条路径
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-80 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4" style={{ zIndex: 100 }}>
       <div className="glass-panel rounded-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden animate-fade-in">
         {/* Header */}
         <div className="p-4 md:p-6 border-b border-neo-border flex items-center justify-between">
@@ -299,9 +553,17 @@ const AlgorithmRunner: React.FC<AlgorithmRunnerProps> = ({
               )}
             </div>
           </div>
-          <button onClick={onClose} className="text-neo-dim hover:text-white p-2">
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setBasicMode(true)}
+              className="text-xs text-neo-dim hover:text-neo-primary px-2 py-1 rounded border border-neo-border hover:border-neo-primary/50"
+            >
+              切换到基础模式
+            </button>
+            <button onClick={onClose} className="text-neo-dim hover:text-white p-2">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Error */}

@@ -187,7 +187,7 @@ const DatabaseManager: React.FC<DatabaseManagerProps> = ({
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-80">
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" style={{ zIndex: 100 }}>
         <div className="glass-panel rounded-2xl p-8 flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-neo-primary border-t-transparent rounded-full animate-spin"></div>
           <span className="text-white font-medium">加载数据库信息...</span>
@@ -197,7 +197,7 @@ const DatabaseManager: React.FC<DatabaseManagerProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-80 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4" style={{ zIndex: 100 }}>
       <div className="glass-panel rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden animate-fade-in">
         {/* Header */}
         <div className="p-4 md:p-6 border-b border-neo-border flex items-center justify-between">
